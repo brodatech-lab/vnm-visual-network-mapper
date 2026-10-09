@@ -6,9 +6,11 @@
 
 #include "vnm/net.hpp"
 
+#if !defined(_WIN32)
 namespace {
 constexpr const char* kRouteFixture = "vnm_test_route_fixture.txt";
 }
+#endif
 
 int main() {
     using namespace vnm;
@@ -22,6 +24,9 @@ int main() {
     CHECK(NetInfo::cidr_for("192.168.1.10", "255.255.255.0") == "192.168.1.10/24");
     CHECK(NetInfo::cidr_for("", "255.255.255.0").empty());
 
+#if !defined(_WIN32)
+    // /proc/net/route parsing is Linux-specific; Windows reads real system
+    // routes via the IP Helper API, which has no fixture form.
     {
         std::ofstream out(kRouteFixture);
         out << "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n";
@@ -42,5 +47,8 @@ int main() {
     CHECK(def->gateway == "192.168.2.1");
 
     std::remove(kRouteFixture);
+#endif
+
     return vnmtest::summary("net");
 }
+

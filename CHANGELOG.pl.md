@@ -6,6 +6,16 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.4.1] - 2026-10-09
+
+### Naprawione
+
+- CI Windows: konfiguracja generatorem Ninja w środowisku deweloperskim MSVC
+  (hostowany obraz `windows-latest` nie udostępnia już generatora o nazwie
+  „Visual Studio 17 2022"). Buildy Windows uruchamiają teraz także testy.
+- `test_net`: sprawdzenia parsera `/proc/net/route` są tylko dla Linuksa, więc
+  testy na Windows przechodzą (Windows czyta realne trasy przez IP Helper API).
+
 ## [0.4.0] - 2026-10-09
 
 Wieloplatformowość: wsparcie Windows (MSVC) obok Linuksa.
