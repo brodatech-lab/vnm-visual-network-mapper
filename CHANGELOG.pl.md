@@ -6,7 +6,7 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
-## [Unreleased]
+## [0.6.3] - 2026-10-09
 
 ### Dodane
 

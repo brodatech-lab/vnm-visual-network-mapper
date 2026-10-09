@@ -6,7 +6,7 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.6.2` – natywny rdzeń (silnik + CLI), historia + diffing na
+> **Status:** `v0.6.3` – natywny rdzeń (silnik + CLI), historia + diffing na
 > SQLite, natywne GUI 2D (Dear ImGui docking), wsparcie **Windows + Linux**,
 > **pasywne wykrywanie** (ARP/DHCP) oraz **eksport SVG/PNG/JSON**.
 

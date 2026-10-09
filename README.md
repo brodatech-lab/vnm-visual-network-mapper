@@ -6,7 +6,7 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.6.2` – native core (engine + CLI), SQLite history + diffing, a
+> **Status:** `v0.6.3` – native core (engine + CLI), SQLite history + diffing, a
 > native 2D GUI (Dear ImGui docking), **Windows + Linux** support, **passive
 > discovery** (ARP/DHCP) and **SVG/PNG/JSON export**.
 
