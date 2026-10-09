@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(vnm
-    VERSION 0.6.0
+    VERSION 0.6.1
     DESCRIPTION "VNM - Visual Network Mapper"
     LANGUAGES C CXX)
 

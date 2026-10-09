@@ -6,6 +6,12 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.6.1] - unreleased
+
+### Zmienione
+
+- Przebudowa canvasu (prace w toku).
+
 ## [0.6.0] - 2026-10-09
 
 Eksport topologii (SVG / PNG / JSON).
