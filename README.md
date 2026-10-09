@@ -6,16 +6,23 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.6.0` – native core (engine + CLI), SQLite history + diffing,
-> a native 2D GUI (Dear ImGui docking), **Windows + Linux** support, **passive
+> **Status:** `v0.6.1` – native core (engine + CLI), SQLite history + diffing, a
+> native 2D GUI (Dear ImGui docking), **Windows + Linux** support, **passive
 > discovery** (ARP/DHCP) and **SVG/PNG/JSON export**.
+
+![VNM – 2D topology map](docs/screenshots/vnm.png)
 
 ## Why
 
-- No Electron / web stack: sub-second startup, low RAM usage.
-- Automatic clustering of hosts into `/24` subnet frames.
-- Risk colouring: 🟢 safe · 🟡 warning · 🔴 critical · ⚪ offline.
-- A single binary on Linux and Windows, no Node.js / Python / Docker.
+- **Fast native startup** and low memory use (a single C++ binary).
+- A **single binary** on Linux and Windows, no Node.js / Python / Docker.
+- **Live 2D topology map** built from Nmap scans and updated *while scanning*:
+  hosts placed **radially around the gateway**, `/24` subnet frames, draggable
+  nodes.
+- Click a host for a **detail card** with its ports and **clickable reference
+  links** (port info, vulnerability search, CVE, MAC vendor lookup).
+- **Passive discovery** (ARP/DHCP), **SQLite history + diffing**, verbose live
+  log, and **SVG/PNG/JSON export**.
 
 ## Requirements
 
@@ -94,29 +101,20 @@ cmake --build build/debug -j
 ./build/debug/src/ui/vnm_gui --scan 192.168.0.1/24   # start a scan immediately
 ```
 
-Use **File → Load JSON…** (with a native file browser) to bring a previously
-exported map back onto the canvas. **About** shows the version and links.
+- **Canvas** – pan & zoom, fit to view, radial layout around the gateway,
+  `/24` subnet frames that follow the nodes, minimap with viewport, status
+  colours. Host nodes are **draggable**; click one to open a persistent
+  **detail card** (also draggable, multiple at once, closed with **×**).
+- **Inspector** – host details and a ports table with reference links.
+- **Scan** – runs `nmap` in the background only after you press **Scan**
+  (target, `-sV`, `-O`, `-sC`, `--script vuln`, timing; **Cancel** + verbose
+  log). The map is **built live** while scanning.
+- **Data** – load from Nmap XML / JSON / the database; export to
+  **SVG / PNG / JSON**; set the browser command.
+- **Passive** – ARP/DHCP discovery (needs capabilities); **Merge to map**.
+- **Log** – human-readable nmap output.
 
-Features: docked panels (Canvas / Inspector / Scan / Data / Log), pan & zoom, fit
-to view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
-with a ports table, and search (`ip`, `host`, `vendor` or `port:22`). The map
-only shows responding hosts (toggle **Only responding**); addresses nmap assumed
-up without a reply are hidden.
-
-The **Scan** panel runs `nmap` in the background only after you press **Scan**
-(target, `-sV`, `-O`, timing; with a **Cancel** button and a verbose,
-human-readable log of nmap's native output — initiating scans, discovered open
-ports, per-host reports). Results replace the map when the scan finishes, and
-the map is **built live** while the scan runs (new hosts/ports appear as they are
-discovered; the camera and node positions are preserved).
-
-The **Passive** panel listens for ARP/DHCP traffic (needs `CAP_NET_RAW` on
-Linux) and lists observed hosts; **Merge to map** folds them into the topology.
-
-Each host detail card (and the Inspector) shows clickable **reference links**
-for open ports: port info (SpeedGuide/IANA/Shodan), service vulnerability search
-(Vulners/NVD/Exploit-DB) and one link per CVE found by NSE (NVD), plus a MAC
-vendor lookup (maclookup.app). Links open in a real browser (firefox/chromium
+Reference links on the cards/Inspector open in a real browser (firefox/chromium
 detected on `PATH`, override with `VNM_BROWSER` or the **Browser** field); the
 exact command is written to the Log.
 
@@ -129,34 +127,26 @@ src/core/           GUI-independent core
   net.cpp           interface detection (getifaddrs / GetAdaptersAddresses)
   scan.cpp          nmap runner (POSIX fork/exec or Windows CreateProcess)
   parse.cpp         dependency-free Nmap XML parser
-  layout.cpp        /24 subnet clustering + 2D grid layout
+  layout.cpp        /24 subnet clustering + radial layout around the gateway
   diff.cpp          scan comparison (added/removed/changed)
   storage.cpp       SQLite backend (scans/hosts/ports) + history
   platform.cpp      portable helpers (process id)
   passive.cpp       passive discovery (libpcap) + ARP/DHCP decoders
+  links.cpp         reference links (SpeedGuide/IANA/Shodan/Vulners/NVD/…)
+  live.cpp          streamed nmap-output parser (live map)
   export.cpp        SVG / PNG / JSON export
+  json.cpp          JSON import
 src/cli/main.cpp    CLI bootstrap
 src/ui/             native 2D GUI (GLFW + OpenGL3 + Dear ImGui docking)
-  main.cpp          app, docking layout, Inspector/Data/Log panels
-  topology_view.cpp 2D canvas (pan/zoom, selection, minimap)
+  main.cpp          app, docking layout, panels, link opening
+  topology_view.cpp 2D canvas (pan/zoom, drag, cards, minimap)
 tests/              unit tests (CTest)
 third_party/stb/    bundled stb_image_write + stb_easy_font
 ```
 
 `vnm_core` (static library) has no GUI dependencies, so it is testable in
-isolation and can be reused by both the CLI and the future GUI.
-
-## Roadmap
-
-- [x] Data model, risk assessment, Nmap XML parser, CLI runner
-- [x] Interface auto-detection and subnet clustering
-- [x] SQLite backend (`~/.config/vnm/storage.db`) and scan diffing
-- [x] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
-- [x] Windows support (MSVC) + GitHub Actions release builds
-- [x] Passive discovery (ARP/DHCP via libpcap)
-- [x] SVG/PNG/JSON export
-- [ ] PDF export
+isolation and can be reused by both the CLI and the GUI.
 
 ## License
 
-To be determined.
+Released under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).

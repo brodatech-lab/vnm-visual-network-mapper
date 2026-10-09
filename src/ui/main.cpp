@@ -1457,6 +1457,7 @@ int main(int argc, char** argv) {
     int db_arg = -1;
     bool auto_scan = false;
     bool target_set = false;
+    bool mock_passive = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1466,6 +1467,8 @@ int main(int argc, char** argv) {
             target_set = true;
         } else if (arg == "--no-service") {
             app.opt_service = false;
+        } else if (arg == "--mock-passive") {
+            mock_passive = true;
         } else if (arg == "--id" && i + 1 < argc) {
             db_arg = std::atoi(argv[++i]);
         } else if (arg == "--db" && i + 1 < argc) {
@@ -1496,6 +1499,29 @@ int main(int argc, char** argv) {
                 app.passive_devices.push_back(vnm::CaptureDevice{iface.name, iface.name});
             }
         }
+    }
+
+    if (mock_passive) {
+        std::lock_guard<std::mutex> lock(app.passive_mtx);
+        const auto add_obs = [&](const char* ip, const char* mac, const char* host,
+                                 const char* vendor, const char* source) {
+            vnm::PassiveObservation o;
+            o.ip = ip;
+            o.mac = mac;
+            o.hostname = host;
+            o.vendor = vendor;
+            o.source = source;
+            o.has_ip = true;
+            o.count = 1;
+            app.passive_table[o.mac] = o;
+        };
+        add_obs("192.168.0.20", "B8:27:EB:11:22:33", "iot-camera",
+                "Raspberry Pi Foundation", "arp");
+        add_obs("192.168.0.31", "3C:22:FB:AA:BB:CC", "laptop.lan", "Apple, Inc.", "dhcp");
+        add_obs("192.168.0.55", "5C:0A:5B:DE:AD:BE", "phone", "Samsung Electronics",
+                "dhcp");
+        add_obs("192.168.0.61", "00:1A:2B:3C:4D:5E", "smart-tv", "LG Electronics", "arp");
+        add_obs("192.168.0.72", "AC:84:C6:11:22:33", "esp-01", "Espressif Inc.", "arp");
     }
 
     if (!glfwInit()) {

@@ -6,16 +6,23 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.6.0` – natywny rdzeń (silnik + CLI), historia + diffing na
+> **Status:** `v0.6.1` – natywny rdzeń (silnik + CLI), historia + diffing na
 > SQLite, natywne GUI 2D (Dear ImGui docking), wsparcie **Windows + Linux**,
 > **pasywne wykrywanie** (ARP/DHCP) oraz **eksport SVG/PNG/JSON**.
 
+![VNM – mapa topologii 2D](docs/screenshots/vnm.png)
+
 ## Dlaczego
 
-- Brak Electrona / web-stacka: start w ułamku sekundy, niskie zużycie RAM.
-- Automatyczne klastrowanie hostów w ramki podsieci `/24`.
-- Kolorystyka ryzyka: 🟢 bezpieczny · 🟡 uwaga · 🔴 krytyczny · ⚪ offline.
-- Jedna binarka na Linuksa i Windowsa, bez Node.js / Pythona / Dockera.
+- **Szybki natywny start** i niskie zużycie RAM (jedna binarka C++).
+- **Jedna binarka** na Linuksa i Windowsa, bez Node.js / Pythona / Dockera.
+- **Mapa topologii 2D na żywo** budowana ze skanów Nmapa i aktualizowana
+  *w trakcie skanowania*: hosty **radialnie wokół bramy**, ramki podsieci `/24`,
+  przeciągalne węzły.
+- Klik w hosta → **karta szczegółów** z portami i **klikalnymi linkami
+  referencyjnymi** (info o porcie, wyszukiwarka podatności, CVE, vendor po MAC).
+- **Pasywne wykrywanie** (ARP/DHCP), **historia SQLite + diffing**, verbose log
+  oraz **eksport SVG/PNG/JSON**.
 
 ## Wymagania
 
@@ -95,33 +102,22 @@ cmake --build build/debug -j
 ./build/debug/src/ui/vnm_gui --scan 192.168.0.1/24   # od razu uruchom skan
 ```
 
-Menu **File → Load JSON…** (z natywnym wyborem pliku) wczytuje wcześniej
-wyeksportowaną mapę z powrotem na canvas. **About** pokazuje wersję i linki.
+- **Canvas** – pan & zoom, dopasowanie widoku, układ radialny wokół bramy,
+  ramki podsieci `/24` podążające za węzłami, minimapa z prostokątem widoku,
+  kolory statusów. Węzły są **przeciągalne**; klik otwiera trwałą **kartę
+  szczegółów** (też przeciągalną, wiele naraz, zamknięcie przez **×**).
+- **Inspector** – szczegóły hosta i tabela portów z linkami.
+- **Scan** – uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel, `-sV`,
+  `-O`, `-sC`, `--script vuln`, timing; **Cancel** + verbose log). Mapa
+  **buduje się na żywo** podczas skanu.
+- **Data** – wczytywanie z XML / JSON / bazy; eksport do **SVG / PNG / JSON**;
+  ustawienie komendy przeglądarki.
+- **Passive** – wykrywanie ARP/DHCP (wymaga uprawnień); **Merge to map**.
+- **Log** – czytelny output nmapa.
 
-Funkcje: dokowane panele (Canvas / Inspector / Scan / Data / Log), pan & zoom,
-dopasowanie widoku, ramki podsieci, kolory ryzyka, minimapa z prostokątem
-widoku, klik-nie-inspect z tabelą portów oraz wyszukiwanie (`ip`, `host`,
-`vendor` lub `port:22`). Mapa pokazuje tylko hosty, które odpowiedziały
-(przełącznik **Only responding**); adresy przyjęte przez nmapa jako „up" bez
-odpowiedzi są ukryte.
-
-Panel **Scan** uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel,
-`-sV`, `-O`, timing; z przyciskiem **Cancel** oraz verbose, czytelnym logiem
-natywnego outputu nmapa — inicjalizacja skanów, wykryte otwarte porty, raporty
-hostów). Wyniki zastępują mapę po zakończeniu skanu, a mapa **buduje się na
-żywo** w trakcie skanu (nowe hosty/porty pojawiają się w miarę wykrywania;
-kamera i pozycje nod są zachowywane).
-
-Panel **Passive** nasłuchuje ruchu ARP/DHCP (wymaga `CAP_NET_RAW` na Linuksie)
-i wypisuje zaobserwowane hosty; **Merge to map** włącza je do topologii.
-
-Każda karta szczegółów hosta (oraz Inspector) pokazuje klikalne **linki
-referencyjne** dla otwartych portów: info o porcie (SpeedGuide/IANA/Shodan),
-wyszukiwarka podatności usługi (Vulners/NVD/Exploit-DB) oraz link do każdego CVE
-wykrytego przez NSE (NVD), a także sprawdzenie vendora po MAC (maclookup.app).
-Linki otwierają się w prawdziwej przeglądarce (firefox/chromium wykrywane z
-`PATH`, nadpisanie przez `VNM_BROWSER` lub pole **Browser**); dokładna komenda
-trafia do Logu.
+Linki referencyjne na kartach/Inspectorze otwierają się w prawdziwej
+przeglądarce (firefox/chromium wykrywane z `PATH`, nadpisanie przez
+`VNM_BROWSER` lub pole **Browser**); dokładna komenda trafia do Logu.
 
 ## Architektura
 
@@ -132,34 +128,26 @@ src/core/           rdzeń niezależny od GUI
   net.cpp           detekcja interfejsów (getifaddrs / GetAdaptersAddresses)
   scan.cpp          runner nmap (POSIX fork/exec lub Windows CreateProcess)
   parse.cpp         bezzależnościowy parser XML Nmapa
-  layout.cpp        klastrowanie podsieci /24 + układ siatki 2D
+  layout.cpp        klastrowanie /24 + układ radialny wokół bramy
   diff.cpp          porównywanie skanów (added/removed/changed)
   storage.cpp       backend SQLite (scans/hosts/ports) + historia
   platform.cpp      przenośne helpery (process id)
   passive.cpp       pasywne wykrywanie (libpcap) + dekodery ARP/DHCP
+  links.cpp         linki referencyjne (SpeedGuide/IANA/Shodan/Vulners/NVD/…)
+  live.cpp          parser strumienia nmapa (mapa na żywo)
   export.cpp        eksport SVG / PNG / JSON
+  json.cpp          import JSON
 src/cli/main.cpp    bootstrap CLI
 src/ui/             natywne GUI 2D (GLFW + OpenGL3 + Dear ImGui docking)
-  main.cpp          aplikacja, dokowanie, panele Inspector/Data/Log
-  topology_view.cpp canvas 2D (pan/zoom, zaznaczanie, minimapa)
+  main.cpp          aplikacja, docking, panele, otwieranie linków
+  topology_view.cpp canvas 2D (pan/zoom, przeciąganie, karty, minimapa)
 tests/              testy jednostkowe (CTest)
 third_party/stb/    dołączone stb_image_write + stb_easy_font
 ```
 
 `vnm_core` (biblioteka statyczna) nie ma zależności GUI, dzięki czemu jest
-testowalna w izolacji i może być użyta zarówno przez CLI, jak i przyszły GUI.
-
-## Roadmap
-
-- [x] Model danych, ocena ryzyka, parser XML Nmapa, runner CLI
-- [x] Auto-detekcja interfejsów i klastrowanie podsieci
-- [x] Backend SQLite (`~/.config/vnm/storage.db`) i diffing skanów
-- [x] GUI 2D (Dear ImGui): canvas, minimapa, inspector, docking
-- [x] Wsparcie Windows (MSVC) + buildy release przez GitHub Actions
-- [x] Pasywne wykrywanie (ARP/DHCP przez libpcap)
-- [x] Eksport SVG/PNG/JSON
-- [ ] Eksport PDF
+testowalna w izolacji i może być użyta zarówno przez CLI, jak i GUI.
 
 ## Licencja
 
-Do ustalenia.
+Wydane na **GNU General Public License v3.0** — patrz [LICENSE](LICENSE).
