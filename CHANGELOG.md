@@ -10,10 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Canvas: clicking a host block draws a detail card **on the canvas itself**,
-  connected to the node by a line, with the same data as the Inspector
-  (IP/MAC/vendor/OS/status/risk + ports list). The **×** on the card deselects.
-  The canvas supports clickable-text hit-testing (hand cursor) for future links.
+- Canvas interaction: host blocks are **draggable** to any position (per-host
+  offset); clicking a host opens a **persistent detail card** drawn on the
+  canvas itself, connected to the node by a line. Multiple cards can stay open
+  at once, cards are draggable too, and each closes via its **×** (top-right).
+  The Inspector mirrors the last focused host.
 
 ## [0.6.0] - 2026-10-09
 

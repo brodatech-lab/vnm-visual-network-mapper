@@ -105,6 +105,8 @@ void refresh(App& app) {
     app.layout = vnm::layout_scan(app.scan, app.config);
     app.view.fit_requested = true;
     app.view.selected = -1;
+    app.view.cards.clear();
+    app.view.node_offset.clear();
     log_line(app, "Loaded scan: " + std::to_string(app.scan.host_count()) + " host(s), " +
                       std::to_string(app.layout.clusters.size()) + " subnet(s)");
 }

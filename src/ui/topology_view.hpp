@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "imgui.h"
 #include "vnm/layout.hpp"
@@ -13,20 +15,30 @@ struct TopologyViewState {
     float zoom{1.0f};
     ImVec2 pan{0.0f, 0.0f};
     bool fit_requested{true};
-    int selected{-1};      // index into scan.hosts, -1 = none
-    // Screen-space geometry of the selected node and of the drawn detail card
-    // (used for the connector, external click handling and the close button).
-    ImVec2 selected_node_a{0.0f, 0.0f};
-    ImVec2 selected_node_b{0.0f, 0.0f};
-    ImVec2 detail_rect_a{0.0f, 0.0f};
-    ImVec2 detail_rect_b{0.0f, 0.0f};
-    ImVec2 detail_close_a{0.0f, 0.0f};
-    ImVec2 detail_close_b{0.0f, 0.0f};
+    int selected{-1};      // host mirrored in the Inspector
     std::string search;    // filter query ("", "192.168", "port:22")
+
+    // Manual node placement: world-space offset added to the layout position.
+    std::unordered_map<std::size_t, ImVec2> node_offset;
+    int dragging_node{-1};
+    bool node_drag_moved{false};
+
+    // Detail cards opened by clicking hosts (screen-space, persistent).
+    struct Card {
+        int host_index{-1};
+        ImVec2 pos{0.0f, 0.0f};       // unclamped top-left
+        ImVec2 rect_a{0.0f, 0.0f};    // last drawn rect
+        ImVec2 rect_b{0.0f, 0.0f};
+        ImVec2 close_a{0.0f, 0.0f};
+        ImVec2 close_b{0.0f, 0.0f};
+        bool dragging{false};
+    };
+    std::vector<Card> cards;
 };
 
-/// Draws the 2D topology into the current window and returns the selected host
-/// index (or -1). Handles pan, zoom, selection and the minimap.
+/// Draws the 2D topology into the current window and returns the host index
+/// mirrored in the Inspector (or -1). Handles pan, zoom, node/card dragging,
+/// selection and the minimap.
 int draw_topology(const Scan& scan, const TopologyLayout& layout,
                   const LayoutConfig& config, TopologyViewState& state);
 
