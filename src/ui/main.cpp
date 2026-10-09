@@ -78,28 +78,114 @@ std::string shell_quote(const std::string& value) {
 
 bool run_command(const std::string& command, bool background);
 
-/// When the GUI runs under sudo, run the browser as the original user (with the
-/// session env) so it can talk to the display/bus.
+/// When the GUI runs under sudo, run the browser as the original user with the
+/// session environment recovered from that user's process, so it can talk to
+/// the display and session bus.
 std::string session_prefix() {
     if (::geteuid() != 0) {
         return {};
     }
-    const char* sudo_user = std::getenv("SUDO_USER");
-    if (sudo_user == nullptr || *sudo_user == '\0') {
+
+    std::string user;
+    if (const char* sudo_user = std::getenv("SUDO_USER");
+        sudo_user != nullptr && *sudo_user != '\0') {
+        user = sudo_user;
+    }
+
+    // Walk up the process tree to the first non-root ancestor (the user's
+    // shell) and read its environment.
+    std::map<std::string, std::string> env;
+    uid_t target_uid = 0;
+    pid_t pid = ::getpid();
+    for (int i = 0; i < 16; ++i) {
+        std::ifstream status("/proc/" + std::to_string(pid) + "/status");
+        pid_t ppid = -1;
+        uid_t uid = 0;
+        std::string line;
+        while (std::getline(status, line)) {
+            if (line.rfind("PPid:", 0) == 0) {
+                ppid = static_cast<pid_t>(std::atoi(line.c_str() + 5));
+            } else if (line.rfind("Uid:", 0) == 0) {
+                uid = static_cast<uid_t>(std::strtoul(line.c_str() + 4, nullptr, 10));
+            }
+        }
+        if (ppid <= 1) {
+            break;
+        }
+        pid = ppid;
+        if (uid != 0) {
+            target_uid = uid;
+            std::ifstream environ("/proc/" + std::to_string(pid) + "/environ",
+                                  std::ios::binary);
+            std::ostringstream ss;
+            ss << environ.rdbuf();
+            const std::string data = ss.str();
+            std::size_t start = 0;
+            while (start < data.size()) {
+                const std::size_t end = data.find('\0', start);
+                const std::string entry =
+                    data.substr(start, end == std::string::npos ? std::string::npos
+                                                                : end - start);
+                const std::size_t eq = entry.find('=');
+                if (eq != std::string::npos) {
+                    env[entry.substr(0, eq)] = entry.substr(eq + 1);
+                }
+                if (end == std::string::npos) {
+                    break;
+                }
+                start = end + 1;
+            }
+            break;
+        }
+    }
+
+    if (user.empty() && target_uid != 0) {
+        if (passwd* pw = ::getpwuid(target_uid)) {
+            user = pw->pw_name;
+        }
+    }
+    if (user.empty()) {
         return {};
     }
-    std::string env;
-    if (const char* display = std::getenv("DISPLAY"); display != nullptr && *display != '\0') {
-        env += " DISPLAY=" + shell_quote(display);
+
+    std::string home;
+    if (passwd* pw = ::getpwnam(user.c_str())) {
+        if (pw->pw_dir != nullptr) {
+            home = pw->pw_dir;
+        }
+        if (target_uid == 0) {
+            target_uid = pw->pw_uid;
+        }
     }
-    if (passwd* pw = ::getpwnam(sudo_user)) {
-        const std::string home = pw->pw_dir != nullptr ? pw->pw_dir : "";
-        env += " XAUTHORITY=" + shell_quote(home + "/.Xauthority");
-        env += " DBUS_SESSION_BUS_ADDRESS=" +
-               shell_quote(std::string("unix:path=/run/user/") +
-                           std::to_string(pw->pw_uid) + "/bus");
-    }
-    return "runuser -u " + shell_quote(sudo_user) + " -- env" + env + " ";
+
+    const auto lookup = [&](const char* key, const std::string& fallback) -> std::string {
+        const auto it = env.find(key);
+        if (it != env.end() && !it->second.empty()) {
+            return it->second;
+        }
+        if (const char* value = std::getenv(key); value != nullptr && *value != '\0') {
+            return value;
+        }
+        return fallback;
+    };
+    const std::string runtime =
+        target_uid != 0 ? "/run/user/" + std::to_string(target_uid) : std::string();
+
+    std::string prefix = "runuser -u " + shell_quote(user) + " -- env";
+    const auto add = [&](const char* key, const std::string& value) {
+        if (!value.empty()) {
+            prefix += std::string(" ") + key + "=" + shell_quote(value);
+        }
+    };
+    add("HOME", home.empty() ? lookup("HOME", "") : home);
+    add("DISPLAY", lookup("DISPLAY", ":0"));
+    add("XAUTHORITY", lookup("XAUTHORITY", home + "/.Xauthority"));
+    add("XDG_RUNTIME_DIR", lookup("XDG_RUNTIME_DIR", runtime));
+    add("DBUS_SESSION_BUS_ADDRESS",
+        lookup("DBUS_SESSION_BUS_ADDRESS", runtime + "/bus"));
+    add("PATH", lookup("PATH", "/usr/local/bin:/usr/bin:/bin:/snap/bin"));
+    prefix += " ";
+    return prefix;
 }
 
 bool run_command(const std::string& command, bool background) {
@@ -246,7 +332,7 @@ bool open_in_shell(ImGuiContext*, const char* url) {
 #else
     const std::string quoted = shell_quote(std::string(url));
     const auto attempt = [&](const std::string& command) -> bool {
-        g_open_log = command;
+        g_open_log = session_prefix() + command;
         return run_command(command, true);
     };
 

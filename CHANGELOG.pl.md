@@ -39,7 +39,10 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   zarejestrowana dla `text/html`) są omijane; dalej domyślny wpis `.desktop`
   (tylko jeśli to przeglądarka), potem `/usr/bin/xdg-open` i `/usr/bin/gio`.
   Zmienna `VNM_BROWSER` / pole **Browser** (w panelu Data) nadpisuje to, a
-  dokładna komenda trafia do Logu. Na Windows używane jest `ShellExecuteW`.
+  dokładna komenda trafia do Logu. Na Windows używane jest `ShellExecuteW`. Pod
+  `sudo` przeglądarka jest uruchamiana jako `SUDO_USER` ze środowiskiem sesji
+  odzyskanym z procesu wywołującego użytkownika
+  (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Pasywny nasłuch bez roota: `scripts/setcap.sh` nadaje binarkom
   `cap_net_raw,cap_net_admin`.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`

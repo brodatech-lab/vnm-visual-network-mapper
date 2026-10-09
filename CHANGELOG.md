@@ -38,7 +38,9 @@ versioning follows [Semantic Versioning](https://semver.org/).
   (only if it is a browser), then `/usr/bin/xdg-open` and `/usr/bin/gio`.
   A `VNM_BROWSER` env var / **Browser** field (in the Data panel) overrides it,
   and the exact command is logged to the Log. On Windows it uses
-  `ShellExecuteW`.
+  `ShellExecuteW`. Under `sudo`, the browser is launched as `SUDO_USER` with the
+  session environment recovered from the invoking user's process
+  (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Passive capture without root: `scripts/setcap.sh` grants
   `cap_net_raw,cap_net_admin` to the binaries.
 - Scan options `-sC` (default scripts) and `--script default,vuln`
