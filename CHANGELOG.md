@@ -22,6 +22,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - Default map layout is now **radial** around the gateway: the `.1` host sits in
   the centre of each subnet frame and the other hosts are placed on a ring
   around it (edges still fan out from the centre).
+- Clicking a detail card brings it to the **front** (cards are hit-tested from
+  the top-most one and the clicked card moves to the end of the draw order).
 
 ## [0.6.0] - 2026-10-09
 

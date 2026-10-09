@@ -136,14 +136,26 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 m = io.MousePos;
         bool handled = false;
-        for (auto& card : state.cards) {
+        // Hit-test cards from the top-most (last drawn) downwards.
+        int clicked_card = -1;
+        for (int i = static_cast<int>(state.cards.size()) - 1; i >= 0; --i) {
+            TopologyViewState::Card& card = state.cards[static_cast<std::size_t>(i)];
             if (point_in(m, card.rect_a, card.rect_b)) {
                 if (!point_in(m, card.close_a, card.close_b)) {
                     card.dragging = true;
                 }
+                clicked_card = i;
                 handled = true;
                 break;
             }
+        }
+        // Clicking a card brings it to the front (drawn last = on top).
+        if (clicked_card >= 0 &&
+            clicked_card != static_cast<int>(state.cards.size()) - 1) {
+            TopologyViewState::Card card = state.cards[static_cast<std::size_t>(clicked_card)];
+            state.cards.erase(state.cards.begin() +
+                              static_cast<std::ptrdiff_t>(clicked_card));
+            state.cards.push_back(card);
         }
         if (!handled) {
             const float wx = (m.x - canvas_p0.x - state.pan.x) / state.zoom;

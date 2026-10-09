@@ -22,6 +22,8 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Domyślny układ mapy jest teraz **radialny wokół bramy**: host `.1` siedzi w
   środku ramki podsieci, a pozostałe hosty są rozłożone na okręgu wokół niego
   (krawędzie nadal rozchodzą się od środka).
+- Kliknięcie karty szczegółów wysuwa ją na **wierzch** (karty testowane od
+  wierzchu, kliknięta karta trafia na koniec kolejności rysowania).
 
 ## [0.6.0] - 2026-10-09
 
