@@ -32,19 +32,21 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - MAC vendor lookup link (maclookup.app) next to the host MAC address.
 - Clicking a canvas chip also writes the URL to the Log, so it can be copied
   when no browser is installed.
-- Link opening uses a fallback chain (`$BROWSER` → `gio open` → `xdg-open` →
-  default `.desktop` via `gtk-launch` → known browsers) so links open in the
-  user's default browser. Run the GUI as your normal user (not root) for this
-  to work.
+- Link opening launches the configured default browser directly from its
+  `.desktop` entry (`Exec=`, snap/flatpak aware), then falls back to `$BROWSER`
+  → `gio open` → `xdg-open` → known browsers. Run the GUI as your normal user
+  (not root).
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.
 - New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
-- **Live map building**: while a scan runs, the growing Nmap XML is re-parsed
-  about every 0.7 s and discovered hosts/ports appear on the canvas in real
-  time. The camera, open cards and **frozen node positions** are preserved;
-  existing nodes never move when new ones arrive (new nodes are placed on a
-  free spot near their subnet). Truncated XML is parsed safely.
+- **Live map building**: while a scan runs, nmap's streamed output is parsed
+  line by line (host reports, discovered open ports, service table) and
+  discovered hosts/ports appear on the canvas in real time — on every platform
+  (it does not depend on nmap's XML file being readable mid-scan). The camera,
+  open cards and **frozen node positions** are preserved; existing nodes never
+  move when new ones arrive (new nodes are placed on a free spot near their
+  subnet).
 
 ## [0.6.0] - 2026-10-09
 

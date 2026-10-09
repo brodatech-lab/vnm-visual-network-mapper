@@ -34,20 +34,22 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Link do sprawdzenia vendora po MAC (maclookup.app) obok adresu MAC hosta.
 - Kliknięcie chipa na canvasie zapisuje też URL do Logu, by można go było
   skopiować, gdy nie ma zainstalowanej przeglądarki.
-- Otwieranie linków używa łańcucha fallbacków (`$BROWSER` → `gio open` →
-  `xdg-open` → domyślny `.desktop` przez `gtk-launch` → znane przeglądarki), więc
-  linki otwierają się w domyślnej przeglądarce. Uruchamiaj GUI jako zwykły
-  użytkownik (nie root), by to działało.
+- Otwieranie linków uruchamia skonfigurowaną domyślną przeglądarkę bezpośrednio
+  z jej wpisu `.desktop` (`Exec=`, obsługa snap/flatpak), a potem fallback:
+  `$BROWSER` → `gio open` → `xdg-open` → znane przeglądarki. Uruchamiaj GUI jako
+  zwykły użytkownik (nie root).
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
   (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
   wykrywane.
 - Eksport/import JSON zachowuje teraz skrypty NSE i CVEs.
 - Nowy moduł `vnm/links.hpp` i `test_links` (9/9 testów CTest).
-- **Budowa mapy na żywo**: podczas skanu rosnący XML Nmapa jest re-parsowany co
-  ~0,7 s i wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym.
-  Kamera, otwarte karty i **zamrożone pozycje nod** są zachowywane; istniejące
-  węzły nie przesuwają się, gdy dochodzą nowe (nowe lądują na wolnym miejscu
-  blisko swojej podsieci). Ucięty XML jest parsowany bezpiecznie.
+- **Budowa mapy na żywo**: podczas skanu strumień wyjścia nmapa jest parsowany
+  linia po linii (raporty hostów, wykryte otwarte porty, tabela usług), a
+  wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym — na
+  każdej platformie (nie zależy od tego, czy plik XML nmapa da się czytać w
+  trakcie). Kamera, otwarte karty i **zamrożone pozycje nod** są zachowywane;
+  istniejące węzły nie przesuwają się, gdy dochodzą nowe (nowe lądują na wolnym
+  miejscu blisko swojej podsieci).
 
 ## [0.6.0] - 2026-10-09
 

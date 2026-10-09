@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -65,8 +66,76 @@ bool run_command(const std::string& command, bool background) {
     return std::system(full.c_str()) == 0;
 }
 
-/// Open a URL/ file in the user's default browser (used by ImGui's link
-/// widgets and the canvas chips).
+/// Read the "Exec=" line from a desktop entry (searched in the usual dirs).
+std::string desktop_exec(const std::string& desktop_name) {
+    if (desktop_name.empty()) {
+        return {};
+    }
+    std::vector<std::string> dirs;
+    if (const char* home = std::getenv("HOME")) {
+        dirs.push_back(std::string(home) + "/.local/share/applications/");
+    }
+    dirs.push_back("/usr/share/applications/");
+    dirs.push_back("/usr/local/share/applications/");
+    dirs.push_back("/var/lib/snapd/desktop/applications/");
+    dirs.push_back("/var/lib/flatpak/exports/share/applications/");
+    for (const auto& dir : dirs) {
+        std::ifstream in(dir + desktop_name);
+        if (!in) {
+            continue;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.rfind("Exec=", 0) == 0) {
+                return line.substr(5);
+            }
+        }
+    }
+    return {};
+}
+
+std::string default_web_browser() {
+    if (FILE* pipe = ::popen("xdg-settings get default-web-browser 2>/dev/null", "r")) {
+        char buffer[256] = {};
+        const bool got = std::fgets(buffer, sizeof(buffer), pipe) != nullptr;
+        ::pclose(pipe);
+        if (got) {
+            std::string name(buffer);
+            while (!name.empty() &&
+                   (name.back() == '\n' || name.back() == '\r' || name.back() == ' ')) {
+                name.pop_back();
+            }
+            return name;
+        }
+    }
+    return {};
+}
+
+/// Replace %u/%U/%f/%F with the (quoted) URL and drop other field codes.
+std::string build_exec_command(const std::string& exec, const std::string& quoted_url) {
+    std::istringstream is(exec);
+    std::string token;
+    std::string command;
+    while (is >> token) {
+        if (token == "%u" || token == "%U" || token == "%f" || token == "%F") {
+            if (!command.empty()) {
+                command.push_back(' ');
+            }
+            command += quoted_url;
+        } else if (token.size() > 0 && token[0] == '%') {
+            continue;
+        } else {
+            if (!command.empty()) {
+                command.push_back(' ');
+            }
+            command += token;
+        }
+    }
+    return command;
+}
+
+/// Open a URL/file in the user's default browser (used by ImGui link widgets
+/// and the canvas chips).
 bool open_in_shell(ImGuiContext*, const char* url) {
     if (url == nullptr || *url == '\0') {
         return false;
@@ -79,28 +148,21 @@ bool open_in_shell(ImGuiContext*, const char* url) {
             return true;
         }
     }
+
+    // Launch the configured default browser directly via its desktop entry.
+    const std::string exec = desktop_exec(default_web_browser());
+    if (!exec.empty()) {
+        const std::string command = build_exec_command(exec, quoted);
+        if (!command.empty() && run_command(command, true)) {
+            return true;
+        }
+    }
+
     if (run_command("gio open " + quoted, false)) {
         return true;
     }
     if (run_command("xdg-open " + quoted, false)) {
         return true;
-    }
-    // Ask for the default web browser desktop entry and launch it explicitly.
-    if (FILE* pipe = ::popen("xdg-settings get default-web-browser 2>/dev/null", "r")) {
-        char buffer[256] = {};
-        const bool got = std::fgets(buffer, sizeof(buffer), pipe) != nullptr;
-        ::pclose(pipe);
-        if (got) {
-            std::string name(buffer);
-            while (!name.empty() &&
-                   (name.back() == '\n' || name.back() == '\r' || name.back() == ' ')) {
-                name.pop_back();
-            }
-            if (!name.empty() &&
-                run_command("gtk-launch " + shell_quote(name) + " " + quoted, false)) {
-                return true;
-            }
-        }
     }
     for (const char* candidate :
          {"firefox", "firefox-esr", "chromium", "google-chrome", "brave-browser"}) {
@@ -109,6 +171,122 @@ bool open_in_shell(ImGuiContext*, const char* url) {
         }
     }
     return false;
+}
+
+int find_or_add_host(vnm::Scan& scan, const std::string& ip) {
+    if (ip.empty()) {
+        return -1;
+    }
+    for (std::size_t i = 0; i < scan.hosts.size(); ++i) {
+        if (scan.hosts[i].address == ip) {
+            return static_cast<int>(i);
+        }
+    }
+    vnm::Host host;
+    host.address = ip;
+    host.status = vnm::HostStatus::Up;
+    host.status_reason = "live";
+    host.subnet = vnm::subnet_of(ip, 24);
+    scan.hosts.push_back(std::move(host));
+    return static_cast<int>(scan.hosts.size()) - 1;
+}
+
+void add_open_port(vnm::Host& host, int number, const std::string& proto) {
+    for (auto& port : host.ports) {
+        if (port.number == number && port.protocol == proto) {
+            port.state = "open";
+            return;
+        }
+    }
+    vnm::Port port;
+    port.number = static_cast<std::uint16_t>(number);
+    port.protocol = proto;
+    port.state = "open";
+    host.ports.push_back(std::move(port));
+}
+
+/// Update `live` from one line of nmap's normal output. This is streamed live
+/// on every platform, unlike nmap's XML file which may stay locked/mid-write.
+void feed_live_output(vnm::Scan& live, int& current, const std::string& line) {
+    if (line.rfind("Nmap scan report for ", 0) == 0) {
+        std::string rest = line.substr(21);
+        std::string ip = rest;
+        const std::size_t l = rest.find('(');
+        if (l != std::string::npos) {
+            const std::size_t r = rest.find(')', l);
+            if (r != std::string::npos) {
+                ip = rest.substr(l + 1, r - l - 1);
+            }
+        } else {
+            const std::size_t sp = rest.find(' ');
+            if (sp != std::string::npos) {
+                ip = rest.substr(0, sp);
+            }
+        }
+        current = find_or_add_host(live, ip);
+        return;
+    }
+    if (current < 0 || static_cast<std::size_t>(current) >= live.hosts.size()) {
+        return;
+    }
+    vnm::Host& host = live.hosts[static_cast<std::size_t>(current)];
+
+    if (line.rfind("Host is up", 0) == 0) {
+        host.status = vnm::HostStatus::Up;
+        return;
+    }
+    if (line.rfind("MAC Address: ", 0) == 0) {
+        const std::string rest = line.substr(13);
+        const std::size_t sp = rest.find(' ');
+        host.mac = (sp == std::string::npos) ? rest : rest.substr(0, sp);
+        const std::size_t lp = rest.find('(');
+        if (lp != std::string::npos) {
+            const std::size_t rp = rest.find(')', lp);
+            if (rp != std::string::npos) {
+                host.vendor = rest.substr(lp + 1, rp - lp - 1);
+            }
+        }
+        return;
+    }
+    if (line.rfind("Discovered open port ", 0) == 0) {
+        const std::string rest = line.substr(21);
+        const std::size_t slash = rest.find('/');
+        const std::size_t on = rest.find(" on ");
+        if (slash != std::string::npos && on != std::string::npos && on > slash) {
+            const int number = std::atoi(rest.substr(0, slash).c_str());
+            const std::string proto = rest.substr(slash + 1, on - slash - 1);
+            const int idx = find_or_add_host(live, rest.substr(on + 4));
+            if (idx >= 0) {
+                add_open_port(live.hosts[static_cast<std::size_t>(idx)], number, proto);
+            }
+        }
+        return;
+    }
+    // Port table line, e.g. "22/tcp   open  ssh     OpenSSH 8.9p1".
+    if (!line.empty() && std::isdigit(static_cast<unsigned char>(line[0]))) {
+        const std::size_t slash = line.find('/');
+        if (slash == std::string::npos) {
+            return;
+        }
+        const int number = std::atoi(line.substr(0, slash).c_str());
+        std::istringstream is(line.substr(slash + 1));
+        std::string proto;
+        std::string state;
+        std::string service;
+        is >> proto >> state >> service;
+        add_open_port(host, number, proto);
+        for (auto& port : host.ports) {
+            if (port.number == number && port.protocol == proto) {
+                if (!state.empty()) {
+                    port.state = state;
+                }
+                if (!service.empty()) {
+                    port.service = service;
+                }
+                break;
+            }
+        }
+    }
 }
 
 /// Background nmap job: the runner runs on its own thread so the UI stays live.
@@ -122,8 +300,9 @@ struct ScanJob {
     std::string error;
     std::string task;          // current nmap task (for the progress display)
     int percent{-1};
+    vnm::Scan live;            // hosts/ports built from the streamed output
+    int live_host{-1};
     std::size_t last_sig{0};   // signature of the last applied live parse
-    std::size_t last_size{0};  // last observed XML file size
     std::chrono::steady_clock::time_point last_live{};
     int exit_code{-1};
 };
@@ -195,6 +374,11 @@ void apply_live_scan(App& app, vnm::Scan scan) {
     }
     const bool was_empty = app.scan.hosts.empty();
     app.scan = std::move(scan);
+    for (auto& host : app.scan.hosts) {
+        if (host.risk == vnm::RiskLevel::Unknown) {
+            host.risk = vnm::evaluate_risk(host);
+        }
+    }
     app.layout = vnm::layout_scan(app.scan, app.config);
 
     std::unordered_map<std::string, bool> present;
@@ -497,43 +681,29 @@ void poll_scan(App& app) {
         std::size_t start = 0;
         while (start < chunk.size()) {
             const std::size_t nl = chunk.find('\n', start);
-            if (nl == std::string::npos) {
-                log_line(app, chunk.substr(start));
+            const bool is_last = (nl == std::string::npos);
+            const std::string line =
+                is_last ? chunk.substr(start) : chunk.substr(start, nl - start);
+            if (!line.empty()) {
+                log_line(app, line);
+                feed_live_output(job->live, job->live_host, line);
+            }
+            if (is_last) {
                 break;
             }
-            if (nl > start) {
-                log_line(app, chunk.substr(start, nl - start));
-            }
             start = nl + 1;
+        }
+
+        // Fold newly discovered hosts/ports onto the canvas right away.
+        const std::size_t sig = scan_signature(job->live);
+        if (!job->live.hosts.empty() && sig != job->last_sig) {
+            job->last_sig = sig;
+            apply_live_scan(app, job->live);
+            log_line(app, "live: " + std::to_string(app.scan.host_count()) + " host(s)");
         }
     }
 
     if (!job->finished.load()) {
-        // Live update: while nmap runs, re-parse the growing XML file and fold
-        // newly discovered hosts onto the canvas.
-        const auto now = std::chrono::steady_clock::now();
-        if (now - job->last_live >= std::chrono::milliseconds(700) &&
-            !job->xml_path.empty()) {
-            job->last_live = now;
-            std::error_code ec;
-            const std::uintmax_t size = std::filesystem::file_size(job->xml_path, ec);
-            if (!ec && size != job->last_size) {
-                job->last_size = static_cast<std::size_t>(size);
-                std::ifstream in(job->xml_path, std::ios::binary);
-                if (in) {
-                    std::ostringstream ss;
-                    ss << in.rdbuf();
-                    vnm::Scan live = vnm::NmapXmlParser::parse(ss.str());
-                    const std::size_t sig = scan_signature(live);
-                    if (!live.hosts.empty() && sig != job->last_sig) {
-                        job->last_sig = sig;
-                        apply_live_scan(app, std::move(live));
-                        log_line(app, "live: " + std::to_string(app.scan.host_count()) +
-                                          " host(s)");
-                    }
-                }
-            }
-        }
         return;
     }
     if (job->thread.joinable()) {
