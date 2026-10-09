@@ -18,8 +18,11 @@ struct TopologyViewState {
     int selected{-1};      // host mirrored in the Inspector
     std::string search;    // filter query ("", "192.168", "port:22")
 
-    // Manual node placement: world-space offset added to the layout position.
-    std::unordered_map<std::size_t, ImVec2> node_offset;
+    // Frozen world-space position of every host, keyed by address. Positions are
+    // assigned lazily (from the layout, de-collided) and never move once placed,
+    // so live-updating maps keep existing nodes in place. Dragging updates the
+    // entry.
+    std::unordered_map<std::string, ImVec2> node_pos;
     int dragging_node{-1};
     bool node_drag_moved{false};
 
@@ -30,7 +33,7 @@ struct TopologyViewState {
         std::string url;
     };
     struct Card {
-        int host_index{-1};
+        std::string address;          // host identity (survives re-layout)
         ImVec2 pos{0.0f, 0.0f};       // unclamped top-left (world space)
         ImVec2 rect_a{0.0f, 0.0f};    // last drawn rect (screen)
         ImVec2 rect_b{0.0f, 0.0f};

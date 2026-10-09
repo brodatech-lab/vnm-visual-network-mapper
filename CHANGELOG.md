@@ -33,6 +33,11 @@ versioning follows [Semantic Versioning](https://semver.org/).
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.
 - New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
+- **Live map building**: while a scan runs, the growing Nmap XML is re-parsed
+  about every 0.7 s and discovered hosts/ports appear on the canvas in real
+  time. The camera, open cards and **frozen node positions** are preserved;
+  existing nodes never move when new ones arrive (new nodes are placed on a
+  free spot near their subnet). Truncated XML is parsed safely.
 
 ## [0.6.0] - 2026-10-09
 

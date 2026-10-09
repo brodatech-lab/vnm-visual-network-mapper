@@ -94,5 +94,24 @@ int main() {
     CHECK(bad.host_count() == 0);
     CHECK(bad.nmap_version.empty());
 
+    // A truncated document (no closing tags) must still yield the hosts parsed
+    // so far -- this is what live updates during a running scan rely on.
+    const char* partial = R"XML(<nmaprun scanner="nmap" version="7.94">
+  <host>
+    <status state="up"/>
+    <address addr="10.1.1.1" addrtype="ipv4"/>
+    <ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports>
+  </host>
+  <host>
+    <status state="up"/>
+    <address addr="10.1.1.2" addrtype="ipv4"/>
+)XML";
+    const Scan live = NmapXmlParser::parse(partial);
+    CHECK(live.host_count() == 2);
+    CHECK(live.hosts[0].address == "10.1.1.1");
+    CHECK(live.hosts[0].open_port_count() == 1);
+    CHECK(live.hosts[1].address == "10.1.1.2");
+    CHECK(live.nmap_version == "7.94");
+
     return vnmtest::summary("parse");
 }

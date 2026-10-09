@@ -36,6 +36,11 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   wykrywane.
 - Eksport/import JSON zachowuje teraz skrypty NSE i CVEs.
 - Nowy moduł `vnm/links.hpp` i `test_links` (9/9 testów CTest).
+- **Budowa mapy na żywo**: podczas skanu rosnący XML Nmapa jest re-parsowany co
+  ~0,7 s i wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym.
+  Kamera, otwarte karty i **zamrożone pozycje nod** są zachowywane; istniejące
+  węzły nie przesuwają się, gdy dochodzą nowe (nowe lądują na wolnym miejscu
+  blisko swojej podsieci). Ucięty XML jest parsowany bezpiecznie.
 
 ## [0.6.0] - 2026-10-09
 

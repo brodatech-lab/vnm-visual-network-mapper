@@ -8,6 +8,7 @@
 #include <atomic>
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +20,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -52,6 +54,9 @@ struct ScanJob {
     std::string error;
     std::string task;          // current nmap task (for the progress display)
     int percent{-1};
+    std::size_t last_sig{0};   // signature of the last applied live parse
+    std::size_t last_size{0};  // last observed XML file size
+    std::chrono::steady_clock::time_point last_live{};
     int exit_code{-1};
 };
 
@@ -109,9 +114,47 @@ void refresh(App& app) {
     app.view.fit_requested = true;
     app.view.selected = -1;
     app.view.cards.clear();
-    app.view.node_offset.clear();
+    app.view.node_pos.clear();
     log_line(app, "Loaded scan: " + std::to_string(app.scan.host_count()) + " host(s), " +
                       std::to_string(app.layout.clusters.size()) + " subnet(s)");
+}
+
+/// Apply a (possibly partial) scan parsed live during a running scan, keeping
+/// the camera, open cards and frozen node positions.
+void apply_live_scan(App& app, vnm::Scan scan) {
+    if (scan.hosts.empty()) {
+        return;
+    }
+    const bool was_empty = app.scan.hosts.empty();
+    app.scan = std::move(scan);
+    app.layout = vnm::layout_scan(app.scan, app.config);
+
+    std::unordered_map<std::string, bool> present;
+    present.reserve(app.scan.hosts.size());
+    for (const auto& host : app.scan.hosts) {
+        present[host.address] = true;
+    }
+    app.view.cards.erase(
+        std::remove_if(app.view.cards.begin(), app.view.cards.end(),
+                       [&](const vnm::ui::TopologyViewState::Card& c) {
+                           return present.find(c.address) == present.end();
+                       }),
+        app.view.cards.end());
+    if (app.view.selected >= 0 &&
+        static_cast<std::size_t>(app.view.selected) >= app.scan.hosts.size()) {
+        app.view.selected = -1;
+    }
+    if (was_empty) {
+        app.view.fit_requested = true; // first hosts -> fit once
+    }
+}
+
+std::size_t scan_signature(const vnm::Scan& scan) {
+    std::size_t sig = scan.hosts.size() * 7 + 1;
+    for (const auto& host : scan.hosts) {
+        sig = sig * 31 + host.open_port_count();
+    }
+    return sig;
 }
 
 bool load_json(App& app, const std::string& path) {
@@ -398,6 +441,31 @@ void poll_scan(App& app) {
     }
 
     if (!job->finished.load()) {
+        // Live update: while nmap runs, re-parse the growing XML file and fold
+        // newly discovered hosts onto the canvas.
+        const auto now = std::chrono::steady_clock::now();
+        if (now - job->last_live >= std::chrono::milliseconds(700) &&
+            !job->xml_path.empty()) {
+            job->last_live = now;
+            std::error_code ec;
+            const std::uintmax_t size = std::filesystem::file_size(job->xml_path, ec);
+            if (!ec && size != job->last_size) {
+                job->last_size = static_cast<std::size_t>(size);
+                std::ifstream in(job->xml_path, std::ios::binary);
+                if (in) {
+                    std::ostringstream ss;
+                    ss << in.rdbuf();
+                    vnm::Scan live = vnm::NmapXmlParser::parse(ss.str());
+                    const std::size_t sig = scan_signature(live);
+                    if (!live.hosts.empty() && sig != job->last_sig) {
+                        job->last_sig = sig;
+                        apply_live_scan(app, std::move(live));
+                        log_line(app, "live: " + std::to_string(app.scan.host_count()) +
+                                          " host(s)");
+                    }
+                }
+            }
+        }
         return;
     }
     if (job->thread.joinable()) {
@@ -425,9 +493,12 @@ void poll_scan(App& app) {
             log_line(app, "error: could not parse scan output");
         } else {
             const std::size_t hosts = scan.host_count();
-            app.scan = std::move(scan);
+            const bool was_empty = app.scan.hosts.empty();
+            apply_live_scan(app, std::move(scan));
+            if (was_empty) {
+                refresh(app); // fresh (non-live) result: fit and reset view
+            }
             log_line(app, "Scan finished: " + std::to_string(hosts) + " host(s)");
-            refresh(app);
         }
     } else {
         log_line(app, "scan produced no output");
@@ -726,6 +797,7 @@ void draw_scan_panel(App& app) {
             ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Scanning... %llds",
                                static_cast<long long>(elapsed));
         }
+        ImGui::Text("Hosts found: %zu", static_cast<std::size_t>(app.scan.host_count()));
     } else {
         ImGui::TextDisabled("Idle");
     }

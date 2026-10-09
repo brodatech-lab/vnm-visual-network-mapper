@@ -106,7 +106,9 @@ odpowiedzi są ukryte.
 Panel **Scan** uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel,
 `-sV`, `-O`, timing; z przyciskiem **Cancel** oraz verbose, czytelnym logiem
 natywnego outputu nmapa — inicjalizacja skanów, wykryte otwarte porty, raporty
-hostów). Wyniki zastępują mapę po zakończeniu skanu.
+hostów). Wyniki zastępują mapę po zakończeniu skanu, a mapa **buduje się na
+żywo** w trakcie skanu (nowe hosty/porty pojawiają się w miarę wykrywania;
+kamera i pozycje nod są zachowywane).
 
 Panel **Passive** nasłuchuje ruchu ARP/DHCP (wymaga `CAP_NET_RAW` na Linuksie)
 i wypisuje zaobserwowane hosty; **Merge to map** włącza je do topologii.

@@ -105,7 +105,9 @@ up without a reply are hidden.
 The **Scan** panel runs `nmap` in the background only after you press **Scan**
 (target, `-sV`, `-O`, timing; with a **Cancel** button and a verbose,
 human-readable log of nmap's native output — initiating scans, discovered open
-ports, per-host reports). Results replace the map when the scan finishes.
+ports, per-host reports). Results replace the map when the scan finishes, and
+the map is **built live** while the scan runs (new hosts/ports appear as they are
+discovered; the camera and node positions are preserved).
 
 The **Passive** panel listens for ARP/DHCP traffic (needs `CAP_NET_RAW` on
 Linux) and lists observed hosts; **Merge to map** folds them into the topology.
