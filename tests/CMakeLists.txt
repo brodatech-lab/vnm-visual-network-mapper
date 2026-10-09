@@ -1,0 +1,17 @@
+add_executable(vnm_test_model test_model.cpp)
+add_executable(vnm_test_parse test_parse.cpp)
+add_executable(vnm_test_layout test_layout.cpp)
+add_executable(vnm_test_net test_net.cpp)
+
+foreach(test_target vnm_test_model vnm_test_parse vnm_test_layout vnm_test_net)
+    target_link_libraries(${test_target} PRIVATE vnm_core)
+    target_include_directories(${test_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${test_target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endforeach()
+
+add_test(NAME model  COMMAND vnm_test_model)
+add_test(NAME parse  COMMAND vnm_test_parse)
+add_test(NAME layout COMMAND vnm_test_layout)
+add_test(NAME net    COMMAND vnm_test_net)
