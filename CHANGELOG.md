@@ -43,6 +43,12 @@ versioning follows [Semantic Versioning](https://semver.org/).
   (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Passive capture without root: `scripts/setcap.sh` grants
   `cap_net_raw,cap_net_admin` to the binaries.
+
+### Fixed
+
+- Inspector: duplicate ImGui IDs when several ports showed the same link labels
+  (SpeedGuide/IANA/Shodan/…). Link widgets are now wrapped in unique `PushID`
+  scopes.
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.

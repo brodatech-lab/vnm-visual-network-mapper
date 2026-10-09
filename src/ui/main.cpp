@@ -1437,14 +1437,18 @@ void draw_host_details(const vnm::Host& host) {
             ImGui::TableSetColumnIndex(4);
             if (port.state == "open") {
                 const std::vector<vnm::RefLink> links = vnm::port_links(host, port);
+                ImGui::PushID(static_cast<int>(port.number) * 2 + (port.protocol == "udp" ? 1 : 0));
                 bool first = true;
-                for (const auto& link : links) {
+                for (std::size_t li = 0; li < links.size(); ++li) {
                     if (!first) {
                         ImGui::SameLine();
                     }
                     first = false;
-                    ImGui::TextLinkOpenURL(link.label.c_str(), link.url.c_str());
+                    ImGui::PushID(static_cast<int>(li));
+                    ImGui::TextLinkOpenURL(links[li].label.c_str(), links[li].url.c_str());
+                    ImGui::PopID();
                 }
+                ImGui::PopID();
             }
         }
         ImGui::EndTable();
@@ -1455,12 +1459,14 @@ void draw_host_details(const vnm::Host& host) {
         ImGui::Separator();
         ImGui::Text("Host CVEs:");
         bool first = true;
-        for (const auto& link : host_refs) {
+        for (std::size_t li = 0; li < host_refs.size(); ++li) {
             if (!first) {
                 ImGui::SameLine();
             }
             first = false;
-            ImGui::TextLinkOpenURL(link.label.c_str(), link.url.c_str());
+            ImGui::PushID(static_cast<int>(li) + 100000);
+            ImGui::TextLinkOpenURL(host_refs[li].label.c_str(), host_refs[li].url.c_str());
+            ImGui::PopID();
         }
     }
 }

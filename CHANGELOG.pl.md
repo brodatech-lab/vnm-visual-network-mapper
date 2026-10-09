@@ -45,6 +45,12 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Pasywny nasłuch bez roota: `scripts/setcap.sh` nadaje binarkom
   `cap_net_raw,cap_net_admin`.
+
+### Naprawione
+
+- Inspector: duplikaty ID ImGui, gdy kilka portów pokazywało te same etykiety
+  linków (SpeedGuide/IANA/Shodan/…). Widgety linków są teraz w unikalnych
+  zakresach `PushID`.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
   (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
   wykrywane.
