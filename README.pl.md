@@ -6,9 +6,9 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.2.0` – natywny rdzeń (silnik + CLI) oraz backend SQLite z
-> historią i diffingiem skanów. Warstwa GUI 2D (Dear ImGui) jest w fazie
-> planowania.
+> **Status:** `v0.3.0` – natywny rdzeń (silnik + CLI), backend SQLite z historią
+> i diffingiem skanów oraz natywne GUI 2D (Dear ImGui docking) z mapą
+> pan/zoom i inspektorem.
 
 ## Dlaczego
 
@@ -23,6 +23,8 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 - CMake ≥ 3.20
 - `nmap` w `PATH` (skanowanie)
 - Opcjonalnie: `nmap` + `setcap` dla detekcji OS / skanów SYN
+- GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany automatycznie przez CMake
+  FetchContent przy pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
 
 ## Szybki start
 
@@ -57,6 +59,23 @@ Opcje `scan`: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
 
 Baza danych domyślnie: `~/.config/vnm/storage.db` (nadpisanie przez `VNM_DB`).
 
+## GUI (mapa 2D)
+
+Zbuduj z `-DVNM_BUILD_GUI=ON` i uruchom `vnm_gui`:
+
+```sh
+cmake -S . -B build/debug -DVNM_BUILD_GUI=ON
+cmake --build build/debug -j
+./build/debug/src/ui/vnm_gui --demo          # wbudowana przykładowa topologia
+./build/debug/src/ui/vnm_gui scan.xml        # wczytaj plik Nmap XML
+./build/debug/src/ui/vnm_gui --id 1          # wczytaj skan #1 z bazy
+```
+
+Funkcje: dokowane panele (Canvas / Inspector / Data / Log), pan & zoom,
+dopasowanie widoku, ramki podsieci, kolory ryzyka, minimapa z prostokątem
+widoku, klik-nie-inspect z tabelą portów oraz wyszukiwanie (`ip`, `host`,
+`vendor` lub `port:22`).
+
 ## Architektura
 
 ```
@@ -70,7 +89,9 @@ src/core/           rdzeń niezależny od GUI
   diff.cpp          porównywanie skanów (added/removed/changed)
   storage.cpp       backend SQLite (scans/hosts/ports) + historia
 src/cli/main.cpp    bootstrap CLI
-src/ui/             docelowy target GUI 2D (Dear ImGui + GLFW)
+src/ui/             natywne GUI 2D (GLFW + OpenGL3 + Dear ImGui docking)
+  main.cpp          aplikacja, dokowanie, panele Inspector/Data/Log
+  topology_view.cpp canvas 2D (pan/zoom, zaznaczanie, minimapa)
 tests/              testy jednostkowe (CTest)
 ```
 
@@ -82,7 +103,7 @@ testowalna w izolacji i może być użyta zarówno przez CLI, jak i przyszły GU
 - [x] Model danych, ocena ryzyka, parser XML Nmapa, runner CLI
 - [x] Auto-detekcja interfejsów i klastrowanie podsieci
 - [x] Backend SQLite (`~/.config/vnm/storage.db`) i diffing skanów
-- [ ] GUI 2D (Dear ImGui): canvas, minimapa, inspector, docking
+- [x] GUI 2D (Dear ImGui): canvas, minimapa, inspector, docking
 - [ ] Pasywne wykrywanie (libpcap), eksport SVG/PNG/PDF
 
 ## Licencja

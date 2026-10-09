@@ -19,3 +19,6 @@ compile_commands.json
 
 # Local helper scripts (kept out of the published repo)
 scripts/
+
+# Dear ImGui runtime layout
+imgui.ini

@@ -6,6 +6,31 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-09
+
+Native 2D GUI (Dear ImGui docking).
+
+### Added
+
+- `vnm_gui` native 2D viewer built on GLFW + OpenGL3 + Dear ImGui (docking
+  branch, fetched automatically via CMake FetchContent).
+- Docked layout: Canvas (centre), Inspector and Data (right), Log (bottom).
+- 2D topology canvas: drag to pan, wheel to zoom about the cursor, fit-to-view,
+  subnet `/24` frames, risk colouring, gateway edges, click-to-select.
+- Minimap with the current viewport rectangle.
+- Inspector panel: host details (IP, MAC, vendor, OS/confidence, status, risk)
+  and a ports table.
+- Data panel: load from an Nmap XML file, from SQLite (path + scan id), or a
+  built-in demo scan.
+- Search/filter box supporting free text and `port:<n>` queries.
+- CLI arguments: `vnm_gui [file.xml] [--id N] [--db PATH] [--demo]`.
+- CMake option `VNM_BUILD_GUI` (default OFF).
+
+### Notes
+
+- The GUI requires a display (X11/Wayland) and OpenGL; it is not covered by
+  the CTest suite.
+
 ## [0.2.0] - 2026-10-09
 
 SQLite backend and scan diffing (time travel).

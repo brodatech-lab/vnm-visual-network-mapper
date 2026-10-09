@@ -6,8 +6,9 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.2.0` – native core (engine + CLI) and an SQLite backend with
-> scan history and diffing. The 2D GUI layer (Dear ImGui) is in planning.
+> **Status:** `v0.3.0` – native core (engine + CLI), an SQLite backend with scan
+> history and diffing, and a native 2D GUI (Dear ImGui docking) with pan/zoom
+> topology map and inspector.
 
 ## Why
 
@@ -22,6 +23,8 @@ built on top of Nmap scan results.
 - CMake ≥ 3.20
 - `nmap` in `PATH` (scanning)
 - Optional: `nmap` + `setcap` for OS detection / SYN scans
+- GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched automatically via CMake
+  FetchContent on first GUI configure, so a network connection is required once)
 
 ## Quick start
 
@@ -56,6 +59,22 @@ ctest --test-dir build/debug --output-on-failure
 
 Default database: `~/.config/vnm/storage.db` (override with `VNM_DB`).
 
+## GUI (2D map)
+
+Build with `-DVNM_BUILD_GUI=ON` and launch `vnm_gui`:
+
+```sh
+cmake -S . -B build/debug -DVNM_BUILD_GUI=ON
+cmake --build build/debug -j
+./build/debug/src/ui/vnm_gui --demo          # built-in sample topology
+./build/debug/src/ui/vnm_gui scan.xml        # load an Nmap XML file
+./build/debug/src/ui/vnm_gui --id 1          # load scan #1 from the database
+```
+
+Features: docked panels (Canvas / Inspector / Data / Log), pan & zoom, fit to
+view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
+with a ports table, and search (`ip`, `host`, `vendor` or `port:22`).
+
 ## Architecture
 
 ```
@@ -69,7 +88,9 @@ src/core/           GUI-independent core
   diff.cpp          scan comparison (added/removed/changed)
   storage.cpp       SQLite backend (scans/hosts/ports) + history
 src/cli/main.cpp    CLI bootstrap
-src/ui/             planned 2D GUI target (Dear ImGui + GLFW)
+src/ui/             native 2D GUI (GLFW + OpenGL3 + Dear ImGui docking)
+  main.cpp          app, docking layout, Inspector/Data/Log panels
+  topology_view.cpp 2D canvas (pan/zoom, selection, minimap)
 tests/              unit tests (CTest)
 ```
 
@@ -81,7 +102,7 @@ isolation and can be reused by both the CLI and the future GUI.
 - [x] Data model, risk assessment, Nmap XML parser, CLI runner
 - [x] Interface auto-detection and subnet clustering
 - [x] SQLite backend (`~/.config/vnm/storage.db`) and scan diffing
-- [ ] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
+- [x] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
 - [ ] Passive discovery (libpcap), SVG/PNG/PDF export
 
 ## License
