@@ -6,6 +6,22 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] - 2026-10-09
+
+### Added
+
+- Windows passive discovery: CMake now fetches the **Npcap SDK** at configure
+  time (build-time only) and links `wpcap`/`Packet`; `VNM_NPCAP_SDK_DIR` can
+  point at an existing SDK. Cross builds stay disabled.
+- `PassiveScanner::devices()` (via `pcap_findalldevs`): the GUI and CLI list
+  real capture devices, so Windows `\Device\NPF_{GUID}` names work (and the
+  panel shows the friendly description).
+
+### Notes
+
+- On Windows, install Npcap and run as Administrator (unless Npcap was installed
+  with the non-admin option). On Linux, `CAP_NET_RAW` is required.
+
 ## [0.5.1] - 2026-10-09
 
 ### Fixed

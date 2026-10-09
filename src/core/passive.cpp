@@ -7,6 +7,9 @@
 #include <string>
 
 #if defined(VNM_HAVE_PCAP)
+#if defined(_WIN32) && !defined(WPCAP)
+#define WPCAP
+#endif
 #include <atomic>
 #include <thread>
 #include <pcap.h>
@@ -215,6 +218,25 @@ PassiveScanner::~PassiveScanner() {
 
 bool PassiveScanner::supported() noexcept { return true; }
 
+std::vector<CaptureDevice> PassiveScanner::devices() {
+    std::vector<CaptureDevice> result;
+    pcap_if_t* alldevs = nullptr;
+    char errbuf[PCAP_ERRBUF_SIZE] = {};
+    if (pcap_findalldevs(&alldevs, errbuf) != 0) {
+        return result;
+    }
+    for (pcap_if_t* dev = alldevs; dev != nullptr; dev = dev->next) {
+        CaptureDevice device;
+        device.name = dev->name != nullptr ? dev->name : "";
+        device.description = dev->description != nullptr ? dev->description : "";
+        if (!device.name.empty()) {
+            result.push_back(std::move(device));
+        }
+    }
+    pcap_freealldevs(alldevs);
+    return result;
+}
+
 bool PassiveScanner::running() const noexcept {
     return impl_ != nullptr && impl_->running.load();
 }
@@ -315,6 +337,8 @@ PassiveScanner::PassiveScanner() : impl_(new Impl) {}
 PassiveScanner::~PassiveScanner() { delete impl_; }
 
 bool PassiveScanner::supported() noexcept { return false; }
+
+std::vector<CaptureDevice> PassiveScanner::devices() { return {}; }
 
 bool PassiveScanner::running() const noexcept { return false; }
 

@@ -4,8 +4,15 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace vnm {
+
+/// A capture device as reported by libpcap/Npcap.
+struct CaptureDevice {
+    std::string name;        // pcap name (e.g. "eth0" or "\Device\NPF_{GUID}")
+    std::string description; // human readable (may be empty)
+};
 
 /// One piece of information passively observed on the wire.
 struct PassiveObservation {
@@ -45,6 +52,9 @@ public:
 
     /// True when the binary was compiled with libpcap support.
     [[nodiscard]] static bool supported() noexcept;
+
+    /// Capture devices available through libpcap/Npcap (empty when unsupported).
+    [[nodiscard]] static std::vector<CaptureDevice> devices();
 
     /// Open `device` (interface name) and start capturing on a worker thread.
     bool start(const std::string& device, Callback on_observation,

@@ -6,9 +6,9 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.5.0` – natywny rdzeń (silnik + CLI), historia + diffing na
+> **Status:** `v0.5.2` – natywny rdzeń (silnik + CLI), historia + diffing na
 > SQLite, natywne GUI 2D (Dear ImGui docking), wsparcie **Windows + Linux** oraz
-> **pasywne wykrywanie** (ARP/DHCP).
+> **pasywne wykrywanie** (ARP/DHCP) na obu platformach.
 
 ## Dlaczego
 
@@ -28,6 +28,8 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 - GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
   pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
 - Pasywne wykrywanie (Linux): `libpcap` (auto-detekcja; wymaga `CAP_NET_RAW`)
+- Pasywne wykrywanie (Windows): zainstaluj sterownik **Npcap** (SDK Npcap jest
+  pobierany automatycznie na etapie build); uruchamiaj jako Administrator
 
 ## Szybki start (Linux)
 

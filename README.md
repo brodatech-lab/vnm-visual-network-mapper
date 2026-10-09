@@ -6,9 +6,9 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.5.0` – native core (engine + CLI), SQLite history + diffing,
+> **Status:** `v0.5.2` – native core (engine + CLI), SQLite history + diffing,
 > a native 2D GUI (Dear ImGui docking), **Windows + Linux** support and
-> **passive discovery** (ARP/DHCP).
+> **passive discovery** (ARP/DHCP) on both platforms.
 
 ## Why
 
@@ -28,6 +28,8 @@ built on top of Nmap scan results.
 - GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
   first GUI configure, so a network connection is needed once)
 - Passive discovery (Linux): `libpcap` (auto-detected; needs `CAP_NET_RAW`)
+- Passive discovery (Windows): install the **Npcap** driver at runtime (the
+  Npcap SDK is fetched automatically at build time); run as Administrator
 
 ## Quick start (Linux)
 

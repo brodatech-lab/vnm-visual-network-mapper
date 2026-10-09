@@ -6,6 +6,22 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.5.2] - 2026-10-09
+
+### Dodane
+
+- Pasywne wykrywanie na Windows: CMake pobiera teraz **Npcap SDK** na etapie
+  konfiguracji (tylko build) i linkuje `wpcap`/`Packet`; `VNM_NPCAP_SDK_DIR`
+  może wskazać istniejące SDK. Cross-compile pozostaje wyłączony.
+- `PassiveScanner::devices()` (przez `pcap_findalldevs`): GUI i CLI pokazują
+  prawdziwe urządzenia przechwytujące, więc nazwy Windows `\Device\NPF_{GUID}`
+  działają (a panel pokazuje czytelny opis).
+
+### Uwagi
+
+- Na Windows zainstaluj Npcap i uruchamiaj jako Administrator (chyba że Npcap
+  zainstalowano z opcją non-admin). Na Linuksie wymagane `CAP_NET_RAW`.
+
 ## [0.5.1] - 2026-10-09
 
 ### Naprawione

@@ -22,7 +22,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "0.5.1";
+constexpr const char* kVersion = "0.5.2";
 
 void print_usage() {
     std::cout <<
@@ -304,15 +304,23 @@ int cmd_sniff(int argc, char** argv, int start) {
     }
 
     if (iface.empty()) {
-        const auto ifaces = vnm::NetInfo::interfaces();
-        for (const auto& face : ifaces) {
-            if (!face.loopback && face.up) {
-                iface = face.name;
-                break;
+        const auto devices = vnm::PassiveScanner::devices();
+        for (const auto& device : devices) {
+            if (device.name == "lo") {
+                continue; // Linux loopback
             }
+            if (device.description.find("Loopback") != std::string::npos ||
+                device.description.find("loopback") != std::string::npos) {
+                continue;
+            }
+            iface = device.name;
+            break;
+        }
+        if (iface.empty() && !devices.empty()) {
+            iface = devices.front().name;
         }
         if (iface.empty()) {
-            for (const auto& face : ifaces) {
+            for (const auto& face : vnm::NetInfo::interfaces()) {
                 if (!face.loopback) {
                     iface = face.name;
                     break;

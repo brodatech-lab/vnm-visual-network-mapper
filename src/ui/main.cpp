@@ -72,8 +72,8 @@ struct App {
     std::unique_ptr<vnm::PassiveScanner> passive;
     std::mutex passive_mtx;
     std::map<std::string, vnm::PassiveObservation> passive_table;
-    std::vector<std::string> passive_ifaces;
-    int passive_iface_index{0};
+    std::vector<vnm::CaptureDevice> passive_devices;
+    int passive_device_index{0};
 };
 
 void log_line(App& app, const std::string& message) {
@@ -330,12 +330,12 @@ void start_passive(App& app) {
         log_line(app, "passive discovery not available (built without libpcap/Npcap)");
         return;
     }
-    if (app.passive_ifaces.empty()) {
-        log_line(app, "passive: no interface selected");
+    if (app.passive_devices.empty()) {
+        log_line(app, "passive: no capture device available");
         return;
     }
     const std::string device =
-        app.passive_ifaces[static_cast<std::size_t>(app.passive_iface_index)];
+        app.passive_devices[static_cast<std::size_t>(app.passive_device_index)].name;
     {
         std::lock_guard<std::mutex> lock(app.passive_mtx);
         app.passive_table.clear();
@@ -583,18 +583,22 @@ void draw_passive_panel(App& app) {
     ImGui::TextWrapped("Passive ARP/DHCP discovery. Needs CAP_NET_RAW (root or "
                        "setcap) on Linux; Npcap on Windows.");
 
-    if (!app.passive_ifaces.empty()) {
+    auto device_label = [](const vnm::CaptureDevice& dev) {
+        return dev.description.empty() ? dev.name : dev.description;
+    };
+    if (!app.passive_devices.empty()) {
         if (running) {
             ImGui::BeginDisabled();
         }
-        const char* current =
-            app.passive_ifaces[static_cast<std::size_t>(app.passive_iface_index)].c_str();
-        if (ImGui::BeginCombo("Interface", current)) {
-            for (int i = 0; i < static_cast<int>(app.passive_ifaces.size()); ++i) {
-                const bool selected = i == app.passive_iface_index;
-                if (ImGui::Selectable(app.passive_ifaces[static_cast<std::size_t>(i)].c_str(),
-                                      selected)) {
-                    app.passive_iface_index = i;
+        const std::string current =
+            device_label(app.passive_devices[static_cast<std::size_t>(app.passive_device_index)]);
+        if (ImGui::BeginCombo("Interface", current.c_str())) {
+            for (int i = 0; i < static_cast<int>(app.passive_devices.size()); ++i) {
+                const bool selected = i == app.passive_device_index;
+                const std::string label = device_label(
+                    app.passive_devices[static_cast<std::size_t>(i)]);
+                if (ImGui::Selectable(label.c_str(), selected)) {
+                    app.passive_device_index = i;
                 }
                 if (selected) {
                     ImGui::SetItemDefaultFocus();
@@ -606,7 +610,7 @@ void draw_passive_panel(App& app) {
             ImGui::EndDisabled();
         }
     } else {
-        ImGui::TextDisabled("no interfaces");
+        ImGui::TextDisabled("no capture devices");
     }
 
     if (!running) {
@@ -828,14 +832,12 @@ int main(int argc, char** argv) {
         init_default_target(app);
     }
 
-    for (const auto& iface : vnm::NetInfo::interfaces()) {
-        if (!iface.loopback) {
-            app.passive_ifaces.push_back(iface.name);
-        }
-    }
-    if (app.passive_ifaces.empty()) {
+    app.passive_devices = vnm::PassiveScanner::devices();
+    if (app.passive_devices.empty()) {
         for (const auto& iface : vnm::NetInfo::interfaces()) {
-            app.passive_ifaces.push_back(iface.name);
+            if (!iface.loopback) {
+                app.passive_devices.push_back(vnm::CaptureDevice{iface.name, iface.name});
+            }
         }
     }
 

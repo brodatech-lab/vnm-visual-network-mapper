@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(vnm
-    VERSION 0.5.1
+    VERSION 0.5.2
     DESCRIPTION "VNM - Visual Network Mapper"
     LANGUAGES C CXX)
 
@@ -22,6 +22,7 @@ option(VNM_BUILD_GUI    "Build the native 2D GUI (Dear ImGui)"   OFF)
 option(VNM_BUILD_TESTS  "Build unit tests"                        ON)
 option(VNM_WERROR       "Treat warnings as errors"                OFF)
 option(VNM_ENABLE_PCAP  "Enable passive discovery (libpcap/Npcap)" ON)
+set(VNM_NPCAP_SDK_DIR "" CACHE PATH "Path to the Npcap SDK (Windows)")
 
 # ---------------------------------------------------------------------------
 # vnm_core: GUI-independent engine (model, net, scan, parse, layout, storage)
@@ -89,6 +90,47 @@ if(VNM_ENABLE_PCAP)
     if(CMAKE_CROSSCOMPILING)
         message(STATUS "VNM: cross-compiling - passive discovery disabled "
                        "(set VNM_ENABLE_PCAP=OFF to silence)")
+    elseif(WIN32)
+        set(VNM_PCAP_INCLUDE_DIR "")
+        set(VNM_PCAP_LIBS "")
+
+        if(VNM_NPCAP_SDK_DIR)
+            set(VNM_PCAP_INCLUDE_DIR "${VNM_NPCAP_SDK_DIR}/Include")
+            find_library(_npcap_wpcap NAMES wpcap
+                PATHS "${VNM_NPCAP_SDK_DIR}/Lib/x64" NO_DEFAULT_PATH)
+            find_library(_npcap_packet NAMES Packet
+                PATHS "${VNM_NPCAP_SDK_DIR}/Lib/x64" NO_DEFAULT_PATH)
+            set(VNM_PCAP_LIBS ${_npcap_wpcap} ${_npcap_packet})
+        else()
+            find_path(VNM_PCAP_INCLUDE_DIR pcap.h)
+            find_library(_npcap_wpcap NAMES wpcap)
+            find_library(_npcap_packet NAMES Packet)
+            set(VNM_PCAP_LIBS ${_npcap_wpcap} ${_npcap_packet})
+        endif()
+
+        if(NOT VNM_PCAP_INCLUDE_DIR OR NOT VNM_PCAP_LIBS)
+            message(STATUS "VNM: Npcap SDK not found, fetching it (build-time only)...")
+            include(FetchContent)
+            FetchContent_Declare(npcap_sdk
+                URL https://npcap.com/dist/npcap-sdk-1.16.zip
+                DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+            FetchContent_MakeAvailable(npcap_sdk)
+            set(VNM_PCAP_INCLUDE_DIR "${npcap_sdk_SOURCE_DIR}/Include")
+            find_library(_npcap_wpcap NAMES wpcap
+                PATHS "${npcap_sdk_SOURCE_DIR}/Lib/x64" NO_DEFAULT_PATH)
+            find_library(_npcap_packet NAMES Packet
+                PATHS "${npcap_sdk_SOURCE_DIR}/Lib/x64" NO_DEFAULT_PATH)
+            set(VNM_PCAP_LIBS ${_npcap_wpcap} ${_npcap_packet})
+        endif()
+
+        if(VNM_PCAP_INCLUDE_DIR AND VNM_PCAP_LIBS)
+            message(STATUS "VNM: Npcap SDK found - passive discovery enabled")
+            target_compile_definitions(vnm_core PUBLIC VNM_HAVE_PCAP WPCAP)
+            target_include_directories(vnm_core PRIVATE ${VNM_PCAP_INCLUDE_DIR})
+            target_link_libraries(vnm_core PRIVATE ${VNM_PCAP_LIBS})
+        else()
+            message(STATUS "VNM: Npcap SDK not available - passive discovery disabled")
+        endif()
     else()
         find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
