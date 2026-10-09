@@ -6,6 +6,14 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-10-09
+
+### Fixed
+
+- GUI Passive panel: pressing **Stop** caused a crash (use-after-free) because
+  the frame kept using `app.passive` after it was reset to null; the status
+  line now checks the scanner pointer before dereferencing it.
+
 ## [0.5.0] - 2026-10-09
 
 Passive discovery (ARP + DHCP).

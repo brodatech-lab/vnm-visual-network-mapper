@@ -626,7 +626,7 @@ void draw_passive_panel(App& app) {
         app.passive_table.clear();
     }
 
-    if (running) {
+    if (app.passive && app.passive->running()) {
         ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Listening... packets: %llu",
                            static_cast<unsigned long long>(app.passive->packets()));
     } else if (!vnm::PassiveScanner::supported()) {
