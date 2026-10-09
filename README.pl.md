@@ -36,8 +36,8 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 - Opcjonalnie: `setcap` dla detekcji OS / skanów SYN
 - GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
   pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
-- Pasywne wykrywanie: `libpcap` (auto-detekcja). Nadaj jednorazowo uprawnienia
-  przez `sudo ./scripts/setcap.sh`, by przechwytywanie działało bez roota.
+- Pasywne wykrywanie: `libpcap` (auto-detekcja). `install.sh` nadaje uprawnienia
+  (`setcap`); ręcznie: `sudo setcap cap_net_raw,cap_net_admin+eip /usr/local/bin/vnm_gui`.
 
 ### Windows
 
@@ -50,22 +50,6 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 - Uruchamiaj jako **Administrator** dla `-sS`/`-O`/ARP, w przeciwnym razie użyj
   connect scan (`-sT`)
 - GUI: GLFW/OpenGL (Dear ImGui i SDK Npcap pobierane na etapie build)
-
-## Budowa na Linux
-
-Instalacja zależności i konfiguracja środowiska (raz, wymaga sudo):
-
-```sh
-sudo ./scripts/setup-dev.sh
-```
-
-Budowa i testy:
-
-```sh
-cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/debug -j
-ctest --test-dir build/debug --output-on-failure
-```
 
 ## Windows: pobierz i uruchom
 
@@ -82,6 +66,33 @@ Bez budowania — użyj gotowego `.exe`:
    **Więcej informacji → Uruchom mimo to**.
 5. Dla skanów SYN/OS/ARP kliknij prawym → **Uruchom jako administrator** (albo
    zainstaluj Npcap z włączonym przechwytywaniem dla nie-adminów).
+
+## Instalacja na Linux
+
+Jednolinijkowa instalacja — pobiera źródła, instaluje zależności, buduje i
+instaluje `vnm` + `vnm_gui` do `/usr/local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/brodatech-lab/vnm-visual-network-mapper/main/install.sh | bash
+```
+
+Albo uruchom z checkoutu:
+
+```sh
+git clone https://github.com/brodatech-lab/vnm-visual-network-mapper.git
+cd vnm-visual-network-mapper
+./install.sh
+```
+
+Ręczna budowa (Debug) i testy:
+
+```sh
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug -DVNM_BUILD_GUI=ON
+cmake --build build/debug -j
+ctest --test-dir build/debug --output-on-failure
+```
+
+Opcje `install.sh`: `--no-deps`, `--no-setcap`, `--prefix <dir>`.
 
 ## Budowa na Windows
 

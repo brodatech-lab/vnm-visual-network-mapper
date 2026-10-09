@@ -36,8 +36,9 @@ built on top of Nmap scan results.
 - Optional: `setcap` for OS detection / SYN scans
 - GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
   first GUI configure, so a network connection is needed once)
-- Passive discovery: `libpcap` (auto-detected). Grant capabilities once with
-  `sudo ./scripts/setcap.sh` so capture works without running as root.
+- Passive discovery: `libpcap` (auto-detected). `install.sh` grants the capture
+  capabilities (`setcap`); to do it manually:
+  `sudo setcap cap_net_raw,cap_net_admin+eip /usr/local/bin/vnm_gui`.
 
 ### Windows
 
@@ -50,22 +51,6 @@ built on top of Nmap scan results.
 - Run as **Administrator** for `-sS`/`-O`/ARP scans, otherwise use a connect
   scan (`-sT`)
 - GUI: GLFW/OpenGL (Dear ImGui and the Npcap SDK are fetched at build time)
-
-## Build on Linux
-
-Install dependencies and configure the environment (once, requires sudo):
-
-```sh
-sudo ./scripts/setup-dev.sh
-```
-
-Build and test:
-
-```sh
-cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/debug -j
-ctest --test-dir build/debug --output-on-failure
-```
 
 ## Windows: download & run
 
@@ -82,6 +67,33 @@ No build required — use the prebuilt `.exe`:
    **More info → Run anyway**.
 5. For SYN/OS/ARP scans, right-click the app → **Run as administrator** (or
    install Npcap with non-admin capture enabled).
+
+## Install on Linux
+
+One-line install — fetches the sources, installs dependencies, builds and
+installs `vnm` + `vnm_gui` to `/usr/local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/brodatech-lab/vnm-visual-network-mapper/main/install.sh | bash
+```
+
+Or run it from a checkout:
+
+```sh
+git clone https://github.com/brodatech-lab/vnm-visual-network-mapper.git
+cd vnm-visual-network-mapper
+./install.sh
+```
+
+Manual build (Debug) and tests:
+
+```sh
+cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug -DVNM_BUILD_GUI=ON
+cmake --build build/debug -j
+ctest --test-dir build/debug --output-on-failure
+```
+
+`install.sh` flags: `--no-deps`, `--no-setcap`, `--prefix <dir>`.
 
 ## Build on Windows
 

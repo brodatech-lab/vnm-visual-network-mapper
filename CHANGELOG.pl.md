@@ -6,6 +6,19 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [Unreleased]
+
+### Dodane
+
+- `install.sh`: jednolinijkowy instalator dla Linuksa (`curl … | bash` lub z
+  checkoutu), który instaluje zależności, buduje i instaluje `vnm` + `vnm_gui`
+  oraz nadaje uprawnienia do przechwytywania.
+
+### Zmienione
+
+- Przebudowa README: Wymagania podzielone na Linux/Windows, sekcja pobierz i
+  uruchom dla Windows, sekcje instalacji/budowy oraz drugi zrzut ekranu.
+
 ## [0.6.2] - 2026-10-09
 
 ### Naprawione
