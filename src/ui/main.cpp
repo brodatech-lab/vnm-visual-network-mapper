@@ -1461,6 +1461,7 @@ int main(int argc, char** argv) {
     bool auto_scan = false;
     bool target_set = false;
     bool mock_passive = false;
+    bool mock_cards = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1472,6 +1473,8 @@ int main(int argc, char** argv) {
             app.opt_service = false;
         } else if (arg == "--mock-passive") {
             mock_passive = true;
+        } else if (arg == "--mock-cards") {
+            mock_cards = true;
         } else if (arg == "--id" && i + 1 < argc) {
             db_arg = std::atoi(argv[++i]);
         } else if (arg == "--db" && i + 1 < argc) {
@@ -1577,6 +1580,29 @@ int main(int argc, char** argv) {
         }
     } else if (db_arg > 0) {
         load_db(app, storage_path, db_arg);
+    }
+
+    if (mock_cards) {
+        int opened = 0;
+        for (const auto& host : app.scan.hosts) {
+            if (opened >= 2) {
+                break;
+            }
+            if (host.status != vnm::HostStatus::Up) {
+                continue;
+            }
+            for (const auto& node : app.layout.nodes) {
+                if (node.host_index < app.scan.hosts.size() &&
+                    app.scan.hosts[node.host_index].address == host.address) {
+                    vnm::ui::TopologyViewState::Card card;
+                    card.address = host.address;
+                    card.pos = ImVec2(node.x + app.config.node_width + 20.0f, node.y);
+                    app.view.cards.push_back(card);
+                    ++opened;
+                    break;
+                }
+            }
+        }
     }
 
     if (auto_scan) {

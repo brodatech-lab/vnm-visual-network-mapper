@@ -74,6 +74,27 @@ std::string subtitle_of(const Host& host) {
     return "open:" + std::to_string(host.open_port_count());
 }
 
+/// Truncate `text` to `max_width` screen pixels (at `size`), adding ".." when it
+/// does not fit.
+std::string fit_text(ImFont* font, float size, const std::string& text, float max_width) {
+    if (font == nullptr || max_width <= 0.0f) {
+        return text;
+    }
+    if (font->CalcTextSizeA(size, 1e30f, 0.0f, text.c_str()).x <= max_width) {
+        return text;
+    }
+    const std::string suffix = "..";
+    std::string out;
+    for (const char c : text) {
+        const std::string trial = out + c + suffix;
+        if (font->CalcTextSizeA(size, 1e30f, 0.0f, trial.c_str()).x > max_width) {
+            break;
+        }
+        out.push_back(c);
+    }
+    return out + suffix;
+}
+
 } // namespace
 
 bool host_matches(const Host& host, const std::string& query) {
@@ -435,13 +456,18 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
         const float thickness =
             (state.selected == static_cast<int>(node.host_index)) ? 3.0f : 1.8f;
         draw->AddRect(a, b, border, 6.0f, 0, thickness);
+        const float ntext_x = a.x + 10.0f * state.zoom + 2.0f;
+        const float nmax_w = (config.node_width - 14.0f) * state.zoom;
+        const std::string address_txt = fit_text(font, font_size, host.address, nmax_w);
+        const std::string subtitle_txt = fit_text(font, small_size, subtitle_of(host), nmax_w);
+        draw->PushClipRect(a, b, true);
         draw->AddText(font, font_size,
-                      ImVec2(a.x + 10.0f * state.zoom + 2.0f, a.y + 6.0f * state.zoom + 2.0f),
-                      title, host.address.c_str());
+                      ImVec2(ntext_x, a.y + 6.0f * state.zoom + 2.0f), title,
+                      address_txt.c_str());
         draw->AddText(font, small_size,
-                      ImVec2(a.x + 10.0f * state.zoom + 2.0f,
-                             a.y + 6.0f * state.zoom + 2.0f + font_size + 3.0f),
-                      sub, subtitle_of(host).c_str());
+                      ImVec2(ntext_x, a.y + 6.0f * state.zoom + 2.0f + font_size + 3.0f),
+                      sub, subtitle_txt.c_str());
+        draw->PopClipRect();
     }
 
     // ---- detail cards (world-space, so they scale with zoom) ----
@@ -550,13 +576,17 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
         draw->AddRect(card_a, card_b, risk_u32(host.risk), 8.0f, 0,
                       std::max(1.0f, 2.0f * state.zoom));
 
+        const float text_max_w = (card_w_w - 2.0f * pad_w) * state.zoom;
+        draw->PushClipRect(card_a, card_b, true);
         float wy = card.pos.y + pad_w;
+        const std::string title_txt = fit_text(font, card_title, host.address, text_max_w);
         draw->AddText(font, card_title, w2s(card.pos.x + pad_w, wy),
-                      IM_COL32(236, 239, 243, 255), host.address.c_str());
+                      IM_COL32(236, 239, 243, 255), title_txt.c_str());
         wy += title_h_w;
         for (const auto& text : info) {
+            const std::string shown_text = fit_text(font, card_font, text, text_max_w);
             draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
-                          IM_COL32(176, 184, 196, 255), text.c_str());
+                          IM_COL32(176, 184, 196, 255), shown_text.c_str());
             wy += line_h_w;
         }
 
@@ -621,8 +651,9 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                 const Port& port = host.ports[i];
                 const ImU32 col = (port.state == "open") ? IM_COL32(210, 216, 224, 255)
                                                          : IM_COL32(130, 138, 150, 255);
+                const std::string port_txt = fit_text(font, card_font, port.describe(), text_max_w);
                 draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy), col,
-                              port.describe().c_str());
+                              port_txt.c_str());
                 wy += line_h_w;
                 if (port.state == "open") {
                     draw_chips(vnm::port_links(host, port));
@@ -631,8 +662,9 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             if (host.ports.size() > shown) {
                 const std::string more =
                     "+" + std::to_string(host.ports.size() - shown) + " more";
+                const std::string more_txt = fit_text(font, card_font, more, text_max_w);
                 draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
-                              IM_COL32(130, 138, 150, 255), more.c_str());
+                              IM_COL32(130, 138, 150, 255), more_txt.c_str());
                 wy += line_h_w;
             }
         }
@@ -659,6 +691,7 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
         if (close_hovered) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         }
+        draw->PopClipRect();
     }
 
     // minimap

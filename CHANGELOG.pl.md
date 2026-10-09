@@ -19,6 +19,12 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Przebudowa README: Wymagania podzielone na Linux/Windows, sekcja pobierz i
   uruchom dla Windows, sekcje instalacji/budowy oraz drugi zrzut ekranu.
 
+### Naprawione
+
+- Tekst na canvasie nie wychodzi już poza ramki nodów/kart: zawartość jest
+  przycinana do prostokąta, a długie linie skracane z `..` (było to mocno
+  widoczne przy oddalaniu).
+
 ## [0.6.2] - 2026-10-09
 
 ### Naprawione

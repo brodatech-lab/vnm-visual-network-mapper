@@ -19,6 +19,12 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - README reorganized: Requirements split into Linux/Windows, a Windows
   download-&-run section, install/build sections, and a second screenshot.
 
+### Fixed
+
+- Canvas text no longer overflows node/card frames: node and detail-card content
+  is clipped to its rectangle and long lines are truncated with `..` (was very
+  visible when zooming out).
+
 ## [0.6.2] - 2026-10-09
 
 ### Fixed

@@ -22,3 +22,6 @@ scripts/
 
 # Dear ImGui runtime layout
 imgui.ini
+
+# Local project notes / prompt (kept out of the repo)
+vnm.txt
