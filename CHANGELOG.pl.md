@@ -6,7 +6,7 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
-## [0.6.1] - unreleased
+## [0.6.1] - 2026-10-09
 
 ### Dodane
 
@@ -45,6 +45,17 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Pasywny nasłuch bez roota: `scripts/setcap.sh` nadaje binarkom
   `cap_net_raw,cap_net_admin`.
+- **Budowa mapy na żywo**: podczas skanu strumień wyjścia nmapa jest parsowany
+  linia po linii (raporty hostów, wykryte otwarte porty, tabela usług), a
+  wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym — na
+  każdej platformie. Układ **odświeża się** wraz z dochodzeniem hostów (nody
+  rozkładają się radialnie), a kamera i otwarte karty są zachowywane.
+- Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
+  (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
+  wykrywane.
+- Eksport/import JSON zachowuje teraz skrypty NSE i CVEs.
+- Nowy moduł `vnm/links.hpp` i `test_links` oraz nowy `vnm/live.hpp`
+  (`LiveOutputParser`) z `test_live` (10/10 testów CTest).
 
 ### Naprawione
 
@@ -54,18 +65,6 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Mapa na żywo: hosty raportowane jako `[host down]` nie są już dodawane, więc
   start skanu nie zalewa canvasu całym zakresem adresów (teraz zgadza się z
   wynikiem końcowym).
-- Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
-  (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
-  wykrywane.
-- Eksport/import JSON zachowuje teraz skrypty NSE i CVEs.
-- Nowy moduł `vnm/links.hpp` i `test_links` (9/9 testów CTest).
-- Nowy moduł `vnm/live.hpp` (`LiveOutputParser`): parser strumienia nmapa
-  używany do budowy mapy na żywo, teraz z testem jednostkowym (`test_live`).
-- **Budowa mapy na żywo**: podczas skanu strumień wyjścia nmapa jest parsowany
-  linia po linii (raporty hostów, wykryte otwarte porty, tabela usług), a
-  wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym — na
-  każdej platformie. Układ **odświeża się** wraz z dochodzeniem hostów (nody
-  rozkładają się radialnie), a kamera i otwarte karty są zachowywane.
 
 ## [0.6.0] - 2026-10-09
 

@@ -6,7 +6,7 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
-## [0.6.1] - unreleased
+## [0.6.1] - 2026-10-09
 
 ### Added
 
@@ -43,6 +43,16 @@ versioning follows [Semantic Versioning](https://semver.org/).
   (`DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`/`DBUS_SESSION_BUS_ADDRESS`/`PATH`).
 - Passive capture without root: `scripts/setcap.sh` grants
   `cap_net_raw,cap_net_admin` to the binaries.
+- **Live map building**: while a scan runs, nmap's streamed output is parsed
+  line by line (host reports, discovered open ports, service table) and
+  discovered hosts/ports appear on the canvas in real time — on every platform.
+  The layout **refreshes** as new hosts arrive (nodes re-distribute radially)
+  while the camera and open cards are preserved.
+- Scan options `-sC` (default scripts) and `--script default,vuln`
+  (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
+- JSON export/import now keeps NSE scripts and CVEs.
+- New `vnm/links.hpp` module and `test_links`; new `vnm/live.hpp`
+  (`LiveOutputParser`) with `test_live` (10/10 CTest tests).
 
 ### Fixed
 
@@ -52,17 +62,6 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - Live map: hosts reported as `[host down]` are no longer added, so starting a
   scan no longer floods the canvas with every address in the range (it now
   matches the final result).
-- Scan options `-sC` (default scripts) and `--script default,vuln`
-  (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
-- JSON export/import now keeps NSE scripts and CVEs.
-- New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
-- New `vnm/live.hpp` module (`LiveOutputParser`): the streamed-nmap-output
-  parser used for live map building, now unit-tested (`test_live`).
-- **Live map building**: while a scan runs, nmap's streamed output is parsed
-  line by line (host reports, discovered open ports, service table) and
-  discovered hosts/ports appear on the canvas in real time — on every platform.
-  The layout **refreshes** as new hosts arrive (nodes re-distribute radially)
-  while the camera and open cards are preserved.
 
 ## [0.6.0] - 2026-10-09
 
