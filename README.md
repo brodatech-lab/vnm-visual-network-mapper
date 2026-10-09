@@ -6,7 +6,7 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.6.1` – native core (engine + CLI), SQLite history + diffing, a
+> **Status:** `v0.6.2` – native core (engine + CLI), SQLite history + diffing, a
 > native 2D GUI (Dear ImGui docking), **Windows + Linux** support, **passive
 > discovery** (ARP/DHCP) and **SVG/PNG/JSON export**.
 
@@ -24,22 +24,34 @@ built on top of Nmap scan results.
 - **Passive discovery** (ARP/DHCP), **SQLite history + diffing**, verbose live
   log, and **SVG/PNG/JSON export**.
 
+![VNM – host detail cards and reference links](docs/screenshots/vnm2.png)
+
 ## Requirements
 
-- C++20 compiler (GCC 13+ / Clang 16+ on Linux; MSVC 2022 on Windows)
+### Linux
+
+- C++20 compiler (GCC 13+ or Clang 16+)
 - CMake ≥ 3.20
 - `nmap` in `PATH` (scanning)
-- Linux: optional `setcap` for OS detection / SYN scans
-- Windows: **Nmap for Windows** (bundles Npcap); run as Administrator for
-  `-sS`/`-O`/ARP scans, otherwise use a connect scan (`-sT`)
+- Optional: `setcap` for OS detection / SYN scans
 - GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
   first GUI configure, so a network connection is needed once)
-- Passive discovery (Linux): `libpcap` (auto-detected). Grant capabilities once
-  with `sudo ./scripts/setcap.sh` so capture works without running as root.
-- Passive discovery (Windows): install the **Npcap** driver at runtime (the
-  Npcap SDK is fetched automatically at build time); run as Administrator
+- Passive discovery: `libpcap` (auto-detected). Grant capabilities once with
+  `sudo ./scripts/setcap.sh` so capture works without running as root.
 
-## Quick start (Linux)
+### Windows
+
+- To **run** the prebuilt binary: nothing but Nmap (below).
+- To **build** from source: MSVC 2022 and CMake ≥ 3.20.
+- **Nmap for Windows** (bundles the Npcap driver):
+  <https://nmap.org/download.html>
+- **Npcap** driver — installed by the Nmap installer; if not, get it at
+  <https://npcap.com/#download>
+- Run as **Administrator** for `-sS`/`-O`/ARP scans, otherwise use a connect
+  scan (`-sT`)
+- GUI: GLFW/OpenGL (Dear ImGui and the Npcap SDK are fetched at build time)
+
+## Build on Linux
 
 Install dependencies and configure the environment (once, requires sudo):
 
@@ -54,6 +66,22 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug -j
 ctest --test-dir build/debug --output-on-failure
 ```
+
+## Windows: download & run
+
+No build required — use the prebuilt `.exe`:
+
+1. **Install Nmap for Windows** (includes the Npcap driver) from
+   <https://nmap.org/download.html>. Keep the **Npcap** component selected in
+   the installer (or install Npcap separately from <https://npcap.com/#download>).
+2. **Download the release** `vnm-windows-x86_64.zip` from
+   <https://github.com/brodatech-lab/vnm-visual-network-mapper/releases> and
+   unzip it.
+3. **Run** `vnm_gui.exe` (double-click) — or `vnm.exe` from a terminal.
+4. **Windows SmartScreen** may warn because the binary is unsigned: click
+   **More info → Run anyway**.
+5. For SYN/OS/ARP scans, right-click the app → **Run as administrator** (or
+   install Npcap with non-admin capture enabled).
 
 ## Build on Windows
 

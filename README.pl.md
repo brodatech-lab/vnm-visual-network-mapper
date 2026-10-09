@@ -6,7 +6,7 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.6.1` – natywny rdzeń (silnik + CLI), historia + diffing na
+> **Status:** `v0.6.2` – natywny rdzeń (silnik + CLI), historia + diffing na
 > SQLite, natywne GUI 2D (Dear ImGui docking), wsparcie **Windows + Linux**,
 > **pasywne wykrywanie** (ARP/DHCP) oraz **eksport SVG/PNG/JSON**.
 
@@ -24,23 +24,34 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 - **Pasywne wykrywanie** (ARP/DHCP), **historia SQLite + diffing**, verbose log
   oraz **eksport SVG/PNG/JSON**.
 
+![VNM – karty szczegółów i linki referencyjne](docs/screenshots/vnm2.png)
+
 ## Wymagania
 
-- Kompilator C++20 (GCC 13+ / Clang 16+ na Linuksie; MSVC 2022 na Windows)
+### Linux
+
+- Kompilator C++20 (GCC 13+ lub Clang 16+)
 - CMake ≥ 3.20
 - `nmap` w `PATH` (skanowanie)
-- Linux: opcjonalnie `setcap` dla detekcji OS / skanów SYN
-- Windows: **Nmap for Windows** (zawiera Npcap); uruchamiaj jako Administrator
-  dla `-sS`/`-O`/ARP, w przeciwnym razie użyj connect scan (`-sT`)
+- Opcjonalnie: `setcap` dla detekcji OS / skanów SYN
 - GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
   pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
-- Pasywne wykrywanie (Linux): `libpcap` (auto-detekcja). Nadaj jednorazowo
-  uprawnienia przez `sudo ./scripts/setcap.sh`, by przechwytywanie działało bez
-  uruchamiania jako root.
-- Pasywne wykrywanie (Windows): zainstaluj sterownik **Npcap** (SDK Npcap jest
-  pobierany automatycznie na etapie build); uruchamiaj jako Administrator
+- Pasywne wykrywanie: `libpcap` (auto-detekcja). Nadaj jednorazowo uprawnienia
+  przez `sudo ./scripts/setcap.sh`, by przechwytywanie działało bez roota.
 
-## Szybki start (Linux)
+### Windows
+
+- Aby **uruchomić** gotową binarkę: wystarczy Nmap (poniżej).
+- Aby **zbudować** ze źródeł: MSVC 2022 oraz CMake ≥ 3.20.
+- **Nmap for Windows** (zawiera sterownik Npcap):
+  <https://nmap.org/download.html>
+- Sterownik **Npcap** — instalowany przez instalator Nmapa; jeśli nie, pobierz z
+  <https://npcap.com/#download>
+- Uruchamiaj jako **Administrator** dla `-sS`/`-O`/ARP, w przeciwnym razie użyj
+  connect scan (`-sT`)
+- GUI: GLFW/OpenGL (Dear ImGui i SDK Npcap pobierane na etapie build)
+
+## Budowa na Linux
 
 Instalacja zależności i konfiguracja środowiska (raz, wymaga sudo):
 
@@ -55,6 +66,22 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug -j
 ctest --test-dir build/debug --output-on-failure
 ```
+
+## Windows: pobierz i uruchom
+
+Bez budowania — użyj gotowego `.exe`:
+
+1. **Zainstaluj Nmap for Windows** (zawiera sterownik Npcap) z
+   <https://nmap.org/download.html>. Zostaw zaznaczony komponent **Npcap** w
+   instalatorze (albo zainstaluj Npcap osobno z <https://npcap.com/#download>).
+2. **Pobierz release** `vnm-windows-x86_64.zip` z
+   <https://github.com/brodatech-lab/vnm-visual-network-mapper/releases> i
+   rozpakuj.
+3. **Uruchom** `vnm_gui.exe` (dwuklik) — lub `vnm.exe` z terminala.
+4. **Windows SmartScreen** może ostrzec, bo binarka nie jest podpisana: kliknij
+   **Więcej informacji → Uruchom mimo to**.
+5. Dla skanów SYN/OS/ARP kliknij prawym → **Uruchom jako administrator** (albo
+   zainstaluj Npcap z włączonym przechwytywaniem dla nie-adminów).
 
 ## Budowa na Windows
 
