@@ -31,6 +31,7 @@ add_library(vnm_core STATIC
     src/core/scan.cpp
     src/core/parse.cpp
     src/core/layout.cpp
+    src/core/diff.cpp
     src/core/storage.cpp)
 
 target_include_directories(vnm_core
@@ -54,6 +55,9 @@ endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(vnm_core PUBLIC Threads::Threads)
+
+find_package(SQLite3 REQUIRED)
+target_link_libraries(vnm_core PUBLIC SQLite::SQLite3)
 
 # ---------------------------------------------------------------------------
 # vnm: command line bootstrap
