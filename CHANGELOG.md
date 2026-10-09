@@ -17,6 +17,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
   The Inspector mirrors the last focused host.
 - Detail cards live in **world space**, so they scale and move together with the
   map when zooming/panning (same as host nodes).
+- The subnet frame (with the scan CIDR) is recomputed from the current node
+  positions, so it grows and moves to keep enclosing its (dragged) hosts.
 
 ## [0.6.0] - 2026-10-09
 

@@ -17,6 +17,8 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   róg). Inspector odzwierciedla ostatnio wybrany host.
 - Karty szczegółów są w **world space**, więc skalują się i przesuwają razem z
   mapą przy zoomie/panie (tak samo jak bloki hostów).
+- Ramka podsieci (z CIDR skanu) jest liczona z aktualnych pozycji nod, więc
+  powiększa się i przesuwa tak, by obejmować swoje (przestawiane) hosty.
 
 ## [0.6.0] - 2026-10-09
 

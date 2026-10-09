@@ -192,20 +192,50 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                         ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y),
                         IM_COL32(24, 26, 31, 255));
 
-    // subnet frames
-    for (const auto& cluster : layout.clusters) {
-        const ImVec2 a = w2s(cluster.x, cluster.y);
-        const ImVec2 b = w2s(cluster.x + cluster.width, cluster.y + cluster.height);
-        draw->AddRectFilled(a, b, IM_COL32(33, 37, 45, 200), 8.0f);
-        draw->AddRect(a, b, IM_COL32(72, 82, 98, 255), 8.0f, 0, 2.0f);
-        draw->AddText(ImVec2(a.x + 10.0f, a.y + 6.0f), IM_COL32(150, 160, 175, 255),
-                      cluster.cidr.c_str());
-    }
-
     std::unordered_map<std::size_t, const NodePosition*> position_of;
     position_of.reserve(layout.nodes.size());
     for (const auto& node : layout.nodes) {
         position_of[node.host_index] = &node;
+    }
+
+    // subnet frames: recomputed from the current (possibly dragged) node
+    // positions, so a frame grows and moves to keep enclosing its hosts.
+    const float frame_pad = config.cluster_padding;
+    const float label_h = ImGui::GetFontSize() + 12.0f;
+    for (const auto& cluster : layout.clusters) {
+        bool any = false;
+        float minx = 0.0f;
+        float miny = 0.0f;
+        float maxx = 0.0f;
+        float maxy = 0.0f;
+        for (const std::size_t hi : cluster.hosts) {
+            const NodePosition* node = position_of[hi];
+            if (node == nullptr) {
+                continue;
+            }
+            const ImVec2 wp = node_world(*node);
+            if (!any) {
+                any = true;
+                minx = wp.x;
+                miny = wp.y;
+                maxx = wp.x + config.node_width;
+                maxy = wp.y + config.node_height;
+            } else {
+                minx = std::min(minx, wp.x);
+                miny = std::min(miny, wp.y);
+                maxx = std::max(maxx, wp.x + config.node_width);
+                maxy = std::max(maxy, wp.y + config.node_height);
+            }
+        }
+        if (!any) {
+            continue;
+        }
+        const ImVec2 a = w2s(minx - frame_pad, miny - frame_pad - label_h);
+        const ImVec2 b = w2s(maxx + frame_pad, maxy + frame_pad);
+        draw->AddRectFilled(a, b, IM_COL32(33, 37, 45, 200), 8.0f);
+        draw->AddRect(a, b, IM_COL32(72, 82, 98, 255), 8.0f, 0, 2.0f);
+        draw->AddText(ImVec2(a.x + 10.0f, a.y + 6.0f), IM_COL32(150, 160, 175, 255),
+                      cluster.cidr.c_str());
     }
 
     // gateway edges
