@@ -14,6 +14,7 @@ struct TopologyViewState {
     ImVec2 pan{0.0f, 0.0f};
     bool fit_requested{true};
     int selected{-1};      // index into scan.hosts, -1 = none
+    ImVec2 selected_screen{0.0f, 0.0f}; // screen anchor of the selected node
     std::string search;    // filter query ("", "192.168", "port:22")
 };
 

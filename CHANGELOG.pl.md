@@ -8,9 +8,11 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [0.6.1] - unreleased
 
-### Zmienione
+### Dodane
 
-- Przebudowa canvasu (prace w toku).
+- Canvas: kliknięcie w blok hosta otwiera zakotwiczoną przy nim pływającą nodę
+  z tymi samymi danymi co Inspector (IP/MAC/vendor/OS/status/ryzyko + tabela
+  portów). Zamknięcie nody odznacza host.
 
 ## [0.6.0] - 2026-10-09
 

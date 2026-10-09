@@ -193,6 +193,9 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
         const float thickness =
             (state.selected == static_cast<int>(node.host_index)) ? 3.0f : 1.8f;
         draw->AddRect(a, b, border, 6.0f, 0, thickness);
+        if (state.selected == static_cast<int>(node.host_index)) {
+            state.selected_screen = ImVec2(b.x + 16.0f, a.y);
+        }
 
         draw->AddText(font, font_size, ImVec2(a.x + 10.0f * state.zoom + 2.0f, a.y + 6.0f * state.zoom + 2.0f),
                       title, host.address.c_str());
@@ -252,6 +255,10 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             if (wx >= node.x && wx <= node.x + config.node_width && wy >= node.y &&
                 wy <= node.y + config.node_height) {
                 picked = static_cast<int>(node.host_index);
+                const ImVec2 a = w2s(node.x, node.y);
+                const ImVec2 b =
+                    w2s(node.x + config.node_width, node.y + config.node_height);
+                state.selected_screen = ImVec2(b.x + 16.0f, a.y);
                 break;
             }
         }

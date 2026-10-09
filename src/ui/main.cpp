@@ -848,16 +848,7 @@ void draw_canvas(App& app) {
     ImGui::End();
 }
 
-void draw_inspector(App& app) {
-    ImGui::Begin("Inspector");
-    const int sel = app.view.selected;
-    if (sel < 0 || static_cast<std::size_t>(sel) >= app.scan.hosts.size()) {
-        ImGui::TextUnformatted("Select a host on the map.");
-        ImGui::End();
-        return;
-    }
-
-    const vnm::Host& host = app.scan.hosts[static_cast<std::size_t>(sel)];
+void draw_host_details(const vnm::Host& host) {
     ImGui::Text("%s", host.address.c_str());
     ImGui::Separator();
 
@@ -895,12 +886,45 @@ void draw_inspector(App& app) {
             ImGui::TableSetColumnIndex(2);
             ImGui::TextUnformatted(port.service.c_str());
             ImGui::TableSetColumnIndex(3);
-            const std::string version = port.product + (port.version.empty() ? "" : " " + port.version);
+            const std::string version =
+                port.product + (port.version.empty() ? "" : " " + port.version);
             ImGui::TextUnformatted(version.c_str());
         }
         ImGui::EndTable();
     }
+}
+
+void draw_inspector(App& app) {
+    ImGui::Begin("Inspector");
+    const int sel = app.view.selected;
+    if (sel < 0 || static_cast<std::size_t>(sel) >= app.scan.hosts.size()) {
+        ImGui::TextUnformatted("Select a host on the map.");
+        ImGui::End();
+        return;
+    }
+    draw_host_details(app.scan.hosts[static_cast<std::size_t>(sel)]);
     ImGui::End();
+}
+
+/// Floating "node" attached to the clicked host, mirroring the inspector data.
+void draw_host_popup(App& app) {
+    const int sel = app.view.selected;
+    if (sel < 0 || static_cast<std::size_t>(sel) >= app.scan.hosts.size()) {
+        return;
+    }
+    bool open = true;
+    ImGui::SetNextWindowPos(app.view.selected_screen, ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(340.0f, 10000.0f));
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize |
+                                   ImGuiWindowFlags_NoDocking |
+                                   ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoCollapse;
+    ImGui::Begin("Host###host_node", &open, flags);
+    draw_host_details(app.scan.hosts[static_cast<std::size_t>(sel)]);
+    ImGui::End();
+    if (!open) {
+        app.view.selected = -1;
+    }
 }
 
 void do_export(App& app, const char* ext) {
@@ -1088,6 +1112,7 @@ int main(int argc, char** argv) {
         draw_passive_panel(app);
         draw_canvas(app);
         draw_inspector(app);
+        draw_host_popup(app);
         draw_data(app);
         draw_log(app);
 

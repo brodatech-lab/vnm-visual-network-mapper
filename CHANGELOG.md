@@ -8,9 +8,11 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [0.6.1] - unreleased
 
-### Changed
+### Added
 
-- Canvas rebuild (work in progress).
+- Canvas: clicking a host block opens a floating node anchored to it, showing
+  the same details as the Inspector (IP/MAC/vendor/OS/status/risk + ports
+  table). Closing the node deselects the host.
 
 ## [0.6.0] - 2026-10-09
 
