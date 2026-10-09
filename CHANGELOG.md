@@ -32,10 +32,13 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - MAC vendor lookup link (maclookup.app) next to the host MAC address.
 - Clicking a canvas chip also writes the URL to the Log, so it can be copied
   when no browser is installed.
-- Link opening launches the configured default browser directly from its
-  `.desktop` entry (`Exec=`, snap/flatpak aware), then falls back to `$BROWSER`
-  → `gio open` → `xdg-open` → known browsers. When the GUI runs under `sudo`,
-  the browser is launched as `SUDO_USER` with the session env.
+- Link opening prefers a **real browser** (firefox/chromium/... on `$PATH`)
+  before any generic URL handler, so hijacked desktop handlers (e.g. an app
+  registered for `text/html`) are avoided; then the default `.desktop` entry
+  (only if it is a browser), then `/usr/bin/xdg-open` and `/usr/bin/gio`.
+  A `VNM_BROWSER` env var / **Browser** field (in the Data panel) overrides it,
+  and the exact command is logged to the Log. On Windows it uses
+  `ShellExecuteW`.
 - Passive capture without root: `scripts/setcap.sh` grants
   `cap_net_raw,cap_net_admin` to the binaries.
 - Scan options `-sC` (default scripts) and `--script default,vuln`

@@ -119,8 +119,9 @@ Każda karta szczegółów hosta (oraz Inspector) pokazuje klikalne **linki
 referencyjne** dla otwartych portów: info o porcie (SpeedGuide/IANA/Shodan),
 wyszukiwarka podatności usługi (Vulners/NVD/Exploit-DB) oraz link do każdego CVE
 wykrytego przez NSE (NVD), a także sprawdzenie vendora po MAC (maclookup.app).
-Otwarcie linku wymaga przeglądarki (`xdg-open` na Linuksie); URL trafia też do
-Logu.
+Linki otwierają się w prawdziwej przeglądarce (firefox/chromium wykrywane z
+`PATH`, nadpisanie przez `VNM_BROWSER` lub pole **Browser**); dokładna komenda
+trafia do Logu.
 
 ## Architektura
 

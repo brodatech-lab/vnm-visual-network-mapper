@@ -28,6 +28,12 @@
 #if !defined(_WIN32)
 #include <pwd.h>
 #include <unistd.h>
+#else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <shellapi.h>
 #endif
 
 #ifndef VNM_VERSION
@@ -49,6 +55,13 @@
 
 namespace {
 
+/// Configured browser command ("auto" -> detect). Set from $VNM_BROWSER / UI.
+std::string g_browser_command;
+/// Last command used to open a URL (drained into the Log by the app).
+std::string g_open_log;
+
+#if !defined(_WIN32)
+
 /// Single-quote a string for /bin/sh.
 std::string shell_quote(const std::string& value) {
     std::string out = "'";
@@ -65,7 +78,6 @@ std::string shell_quote(const std::string& value) {
 
 bool run_command(const std::string& command, bool background);
 
-#if !defined(_WIN32)
 /// When the GUI runs under sudo, run the browser as the original user (with the
 /// session env) so it can talk to the display/bus.
 std::string session_prefix() {
@@ -89,9 +101,6 @@ std::string session_prefix() {
     }
     return "runuser -u " + shell_quote(sudo_user) + " -- env" + env + " ";
 }
-#else
-std::string session_prefix() { return {}; }
-#endif
 
 bool run_command(const std::string& command, bool background) {
     std::string full = session_prefix() + command + " >/dev/null 2>&1";
@@ -169,43 +178,124 @@ std::string build_exec_command(const std::string& exec, const std::string& quote
     return command;
 }
 
+/// Find an executable on $PATH (or an absolute path) that we can exec.
+std::string find_on_path(const std::string& name) {
+    if (name.find('/') != std::string::npos) {
+        return ::access(name.c_str(), X_OK) == 0 ? name : std::string();
+    }
+    const char* path = std::getenv("PATH");
+    if (path == nullptr) {
+        return {};
+    }
+    const std::string dirs(path);
+    std::size_t start = 0;
+    while (start <= dirs.size()) {
+        const std::size_t colon = dirs.find(':', start);
+        const std::string dir =
+            colon == std::string::npos ? dirs.substr(start) : dirs.substr(start, colon - start);
+        if (!dir.empty()) {
+            const std::string full = dir + "/" + name;
+            if (::access(full.c_str(), X_OK) == 0) {
+                return full;
+            }
+        }
+        if (colon == std::string::npos) {
+            break;
+        }
+        start = colon + 1;
+    }
+    return {};
+}
+
+/// Heuristic: is this desktop entry / command a real web browser?
+bool looks_like_browser(const std::string& text) {
+    static const char* tokens[] = {"firefox", "chromium", "chrome", "brave",
+                                   "epiphany", "vivaldi", "opera", "edge",
+                                   "microsoft-edge"};
+    std::string lower = text;
+    for (char& c : lower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    for (const char* token : tokens) {
+        if (lower.find(token) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+
 /// Open a URL/file in the user's default browser (used by ImGui link widgets
 /// and the canvas chips).
 bool open_in_shell(ImGuiContext*, const char* url) {
     if (url == nullptr || *url == '\0') {
         return false;
     }
+
+#if defined(_WIN32)
+    const int wlen = MultiByteToWideChar(CP_UTF8, 0, url, -1, nullptr, 0);
+    if (wlen <= 0) {
+        return false;
+    }
+    std::wstring wide(static_cast<std::size_t>(wlen), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, url, -1, wide.data(), wlen);
+    g_open_log = std::string("ShellExecuteW ") + url;
+    const HINSTANCE handle =
+        ShellExecuteW(nullptr, L"open", wide.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(handle) > 32;
+#else
     const std::string quoted = shell_quote(std::string(url));
+    const auto attempt = [&](const std::string& command) -> bool {
+        g_open_log = command;
+        return run_command(command, true);
+    };
 
-    if (const char* browser = std::getenv("BROWSER");
-        browser != nullptr && *browser != '\0') {
-        if (run_command(shell_quote(std::string(browser)) + " " + quoted, true)) {
+    // 1) explicitly configured browser ($VNM_BROWSER / UI field / $BROWSER)
+    std::string configured = g_browser_command;
+    if (configured.empty()) {
+        if (const char* env = std::getenv("BROWSER"); env != nullptr && *env != '\0') {
+            configured = env;
+        }
+    }
+    if (!configured.empty()) {
+        if (attempt(shell_quote(configured) + " " + quoted)) {
             return true;
         }
     }
 
-    // Launch the configured default browser directly via its desktop entry.
-    const std::string exec = desktop_exec(default_web_browser());
-    if (!exec.empty()) {
-        const std::string command = build_exec_command(exec, quoted);
-        if (!command.empty() && run_command(command, true)) {
+    // 2) a real browser on PATH (avoids hijacked generic URL handlers)
+    for (const char* candidate : {"firefox", "firefox-esr", "chromium",
+                                  "chromium-browser", "google-chrome",
+                                  "brave-browser", "epiphany"}) {
+        const std::string path = find_on_path(candidate);
+        if (!path.empty() && attempt(shell_quote(path) + " " + quoted)) {
             return true;
         }
     }
 
-    if (run_command("gio open " + quoted, false)) {
+    // 3) the configured default browser, only if it really is a browser
+    const std::string desktop_name = default_web_browser();
+    if (looks_like_browser(desktop_name)) {
+        const std::string exec = desktop_exec(desktop_name);
+        if (!exec.empty()) {
+            const std::string command = build_exec_command(exec, quoted);
+            if (!command.empty() && attempt(command)) {
+                return true;
+            }
+        }
+    }
+
+    // 4) system generic openers (absolute paths; skip Homebrew's gio)
+    if (::access("/usr/bin/xdg-open", X_OK) == 0 &&
+        attempt("/usr/bin/xdg-open " + quoted)) {
         return true;
     }
-    if (run_command("xdg-open " + quoted, false)) {
+    if (::access("/usr/bin/gio", X_OK) == 0 &&
+        attempt("/usr/bin/gio open " + quoted)) {
         return true;
-    }
-    for (const char* candidate :
-         {"firefox", "firefox-esr", "chromium", "google-chrome", "brave-browser"}) {
-        if (run_command(std::string(candidate) + " " + quoted, true)) {
-            return true;
-        }
     }
     return false;
+#endif
 }
 
 int find_or_add_host(vnm::Scan& scan, const std::string& ip) {
@@ -357,6 +447,7 @@ struct App {
     char db_path_buf[512]{};
     char export_buf[512] = "vnm_export";
     char json_path_buf[512] = "vnm_export.json";
+    char browser_buf[512] = "auto";
     bool open_load_json{false};
     bool show_about{false};
     bool show_browser{false};
@@ -1341,6 +1432,13 @@ void draw_data(App& app) {
     }
 
     ImGui::Separator();
+    ImGui::TextWrapped("Browser for links (\"auto\" = auto-detect, or a command):");
+    if (ImGui::InputText("Browser", app.browser_buf, sizeof(app.browser_buf))) {
+        const std::string value = app.browser_buf;
+        g_browser_command = (value == "auto" || value.empty()) ? std::string() : value;
+    }
+
+    ImGui::Separator();
     ImGui::TextWrapped("Export the current map (base path + format extension):");
     ImGui::InputText("Export base", app.export_buf, sizeof(app.export_buf));
     if (ImGui::Button("SVG")) {
@@ -1405,6 +1503,12 @@ int main(int argc, char** argv) {
     }
     if (!target_set) {
         init_default_target(app);
+    }
+
+    if (const char* browser = std::getenv("VNM_BROWSER");
+        browser != nullptr && *browser != '\0') {
+        g_browser_command = browser;
+        std::snprintf(app.browser_buf, sizeof(app.browser_buf), "%s", browser);
     }
 
     app.passive_devices = vnm::PassiveScanner::devices();
@@ -1480,6 +1584,11 @@ int main(int argc, char** argv) {
         ImGui::NewFrame();
 
         poll_scan(app);
+
+        if (!g_open_log.empty()) {
+            log_line(app, "open (cmd): " + g_open_log);
+            g_open_log.clear();
+        }
 
         build_dockspace(app);
         draw_scan_panel(app);

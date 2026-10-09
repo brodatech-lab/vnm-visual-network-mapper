@@ -34,10 +34,12 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Link do sprawdzenia vendora po MAC (maclookup.app) obok adresu MAC hosta.
 - Kliknięcie chipa na canvasie zapisuje też URL do Logu, by można go było
   skopiować, gdy nie ma zainstalowanej przeglądarki.
-- Otwieranie linków uruchamia skonfigurowaną domyślną przeglądarkę bezpośrednio
-  z jej wpisu `.desktop` (`Exec=`, obsługa snap/flatpak), a potem fallback:
-  `$BROWSER` → `gio open` → `xdg-open` → znane przeglądarki. Gdy GUI działa pod
-  `sudo`, przeglądarka jest uruchamiana jako `SUDO_USER` z env sesji.
+- Otwieranie linków preferuje **prawdziwą przeglądarkę** (firefox/chromium/... z
+  `$PATH`) przed ogólnymi handlerami URL, więc przejęte handlery (np. aplikacja
+  zarejestrowana dla `text/html`) są omijane; dalej domyślny wpis `.desktop`
+  (tylko jeśli to przeglądarka), potem `/usr/bin/xdg-open` i `/usr/bin/gio`.
+  Zmienna `VNM_BROWSER` / pole **Browser** (w panelu Data) nadpisuje to, a
+  dokładna komenda trafia do Logu. Na Windows używane jest `ShellExecuteW`.
 - Pasywny nasłuch bez roota: `scripts/setcap.sh` nadaje binarkom
   `cap_net_raw,cap_net_admin`.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
