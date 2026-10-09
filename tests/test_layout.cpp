@@ -16,9 +16,18 @@ int main() {
     for (int i = 1; i <= 2; ++i) {
         Host h;
         h.address = "10.0.0." + std::to_string(i);
+        h.status = HostStatus::Up;
         h.subnet = "10.0.0.0/24";
         scan.hosts.push_back(std::move(h));
     }
+
+    // A host that nmap assumed up (no real response) must not be placed.
+    Host assumed;
+    assumed.address = "192.168.1.200";
+    assumed.subnet = "192.168.1.0/24";
+    assumed.status = HostStatus::Up;
+    assumed.status_reason = "user-set";
+    scan.hosts.push_back(std::move(assumed));
 
     const TopologyLayout layout = layout_scan(scan);
     CHECK(layout.nodes.size() == 7);
@@ -27,6 +36,11 @@ int main() {
     CHECK(layout.clusters[1].cidr == "192.168.1.0/24");
     CHECK(layout.width > 0.0f);
     CHECK(layout.height > 0.0f);
+
+    // With the filter off, the assumed host appears too.
+    LayoutConfig all;
+    all.only_responsive = false;
+    CHECK(layout_scan(scan, all).nodes.size() == 8);
 
     for (const auto& node : layout.nodes) {
         CHECK(node.x >= 0.0f);

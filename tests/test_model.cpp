@@ -34,5 +34,24 @@ int main() {
     CHECK(std::string(to_string(RiskLevel::Critical)) == "critical");
     CHECK(risk_color(RiskLevel::Safe) == 0x2ECC71);
 
+    // Responsiveness: real discovery reasons count, assumed ones do not.
+    Host real;
+    real.status = HostStatus::Up;
+    real.status_reason = "syn-ack";
+    CHECK(real.is_responsive());
+
+    Host assumed;
+    assumed.status = HostStatus::Up;
+    assumed.status_reason = "user-set";
+    CHECK(!assumed.is_responsive());
+    CHECK(!assumed.has_open_port());
+
+    assumed.ports.push_back(Port{22, "tcp", "open", "ssh", "", "", ""});
+    CHECK(assumed.is_responsive()); // open port wins over the assumed reason
+
+    Host no_reason;
+    no_reason.status = HostStatus::Up;
+    CHECK(no_reason.is_responsive()); // hand-built host without a reason
+
     return vnmtest::summary("model");
 }

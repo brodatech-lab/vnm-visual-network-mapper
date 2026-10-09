@@ -90,7 +90,9 @@ cmake --build build/debug -j
 Funkcje: dokowane panele (Canvas / Inspector / Scan / Data / Log), pan & zoom,
 dopasowanie widoku, ramki podsieci, kolory ryzyka, minimapa z prostokątem
 widoku, klik-nie-inspect z tabelą portów oraz wyszukiwanie (`ip`, `host`,
-`vendor` lub `port:22`).
+`vendor` lub `port:22`). Mapa pokazuje tylko hosty, które odpowiedziały
+(przełącznik **Only responding**); adresy przyjęte przez nmapa jako „up" bez
+odpowiedzi są ukryte.
 
 Panel **Scan** uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel,
 `-sV`, `-O`, timing; z przyciskiem **Cancel** oraz verbose, czytelnym logiem

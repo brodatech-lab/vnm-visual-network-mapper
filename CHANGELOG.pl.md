@@ -6,6 +6,22 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.4.2] - 2026-10-09
+
+### Dodane
+
+- Rozpoznawanie odpowiedzi hosta: parsowany jest `<status reason>` nmapa, a
+  hosty przyjęte jako „up" bez realnej odpowiedzi (np. `user-set`,
+  `unknown-response`) nie trafiają na mapę 2D; otwarty port zawsze liczy się
+  jako odpowiedź.
+- Przełącznik w canvasie **Only responding** (domyślnie włączony) oraz
+  `LayoutConfig::only_responsive`.
+
+### Naprawione
+
+- Mapa topologii nie wypełnia się już wszystkimi adresami zakresu, gdy nmap
+  oznacza hosty jako „up" bez faktycznej odpowiedzi.
+
 ## [0.4.1] - 2026-10-09
 
 ### Naprawione

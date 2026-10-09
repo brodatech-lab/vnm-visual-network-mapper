@@ -41,6 +41,9 @@ TopologyLayout layout_scan(const Scan& scan, const LayoutConfig& config) {
     std::map<std::string, std::vector<std::size_t>> groups;
     std::vector<std::string> order;
     for (std::size_t i = 0; i < scan.hosts.size(); ++i) {
+        if (config.only_responsive && !scan.hosts[i].is_responsive()) {
+            continue; // do not clutter the map with non-answering addresses
+        }
         std::string key = scan.hosts[i].subnet;
         if (key.empty()) {
             key = subnet_of(scan.hosts[i].address, 24);

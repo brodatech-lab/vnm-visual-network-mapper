@@ -40,12 +40,18 @@ struct Host {
     std::string os_name;
     int os_confidence{0};           // 0..100
     HostStatus status{HostStatus::Unknown};
+    std::string status_reason;      // nmap <status reason="..."> (e.g. syn-ack)
     RiskLevel risk{RiskLevel::Unknown};
     std::vector<Port> ports;
     std::string subnet;             // "192.168.1.0/24"
 
     [[nodiscard]] bool has_open_port() const;
     [[nodiscard]] std::size_t open_port_count() const;
+
+    /// True when the host gave a real response (open port or a network-level
+    /// discovery reason). Hosts assumed up without any response (e.g. nmap
+    /// `-Pn`, reason "user-set"/"unknown-response") are not responsive.
+    [[nodiscard]] bool is_responsive() const;
 };
 
 /// Result of one Nmap invocation.

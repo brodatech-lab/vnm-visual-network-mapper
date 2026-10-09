@@ -41,6 +41,7 @@ struct LayoutConfig {
     float cluster_padding{28.0f};
     float cluster_gap{48.0f};
     int columns_per_cluster{4};
+    bool only_responsive{true}; // hide hosts that never actually answered
 };
 
 /// Groups hosts by subnet into frames and lays each cluster out on a grid.

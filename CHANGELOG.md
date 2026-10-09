@@ -6,6 +6,21 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-10-09
+
+### Added
+
+- Host responsiveness: the nmap `<status reason>` is now parsed and hosts that
+  were assumed up without a real reply (e.g. `user-set`, `unknown-response`)
+  are kept off the 2D map; any open port always counts as responsive.
+- Canvas toggle **Only responding** (default on) and
+  `LayoutConfig::only_responsive`.
+
+### Fixed
+
+- The topology map no longer fills up with every address of a scanned range
+  when nmap reports hosts as up without an actual response.
+
 ## [0.4.1] - 2026-10-09
 
 ### Fixed

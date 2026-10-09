@@ -463,6 +463,14 @@ void draw_canvas(App& app) {
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.50f, 0.55f, 0.55f, 1.0f), "offline");
 
+    ImGui::SameLine();
+    bool only_responsive = app.config.only_responsive;
+    if (ImGui::Checkbox("Only responding", &only_responsive)) {
+        app.config.only_responsive = only_responsive;
+        app.layout = vnm::layout_scan(app.scan, app.config);
+        app.view.fit_requested = true;
+    }
+
     app.view.selected = vnm::ui::draw_topology(app.scan, app.layout, app.config, app.view);
 
     ImGui::End();
@@ -485,7 +493,10 @@ void draw_inspector(App& app) {
     ImGui::Text("Vendor:     %s", host.vendor.empty() ? "-" : host.vendor.c_str());
     ImGui::Text("MAC:        %s", host.mac.empty() ? "-" : host.mac.c_str());
     ImGui::Text("Subnet:     %s", host.subnet.empty() ? "-" : host.subnet.c_str());
-    ImGui::Text("Status:     %s", vnm::to_string(host.status));
+    const std::string status =
+        std::string(vnm::to_string(host.status)) +
+        (host.status_reason.empty() ? "" : " (" + host.status_reason + ")");
+    ImGui::Text("Status:     %s", status.c_str());
     ImGui::Text("OS:         %s%s", host.os_name.empty() ? "-" : host.os_name.c_str(),
                 host.os_confidence > 0
                     ? (" (" + std::to_string(host.os_confidence) + "%)").c_str()

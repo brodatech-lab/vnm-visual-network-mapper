@@ -277,6 +277,9 @@ void parse_host(const XmlNode& node, Host& host) {
         if (const std::string* state = status->attr("state")) {
             host.status = (*state == "up") ? HostStatus::Up : HostStatus::Down;
         }
+        if (const std::string* reason = status->attr("reason")) {
+            host.status_reason = *reason;
+        }
     }
 
     for (const auto& addr : node.children) {

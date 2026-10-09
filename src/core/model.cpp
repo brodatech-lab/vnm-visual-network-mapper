@@ -56,6 +56,24 @@ std::size_t Host::open_port_count() const {
     return count;
 }
 
+bool Host::is_responsive() const {
+    if (status != HostStatus::Up) {
+        return false;
+    }
+    if (has_open_port()) {
+        return true;
+    }
+    // A positive discovery reason means the host answered something.
+    if (status_reason.empty()) {
+        return true; // no reason recorded (old data / hand-built hosts)
+    }
+    if (status_reason == "user-set" || status_reason == "unknown-response" ||
+        status_reason == "no-response") {
+        return false; // nmap assumed it was up without a real reply
+    }
+    return true;
+}
+
 const char* to_string(HostStatus status) noexcept {
     switch (status) {
         case HostStatus::Up:      return "up";

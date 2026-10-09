@@ -89,7 +89,9 @@ cmake --build build/debug -j
 
 Features: docked panels (Canvas / Inspector / Scan / Data / Log), pan & zoom, fit
 to view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
-with a ports table, and search (`ip`, `host`, `vendor` or `port:22`).
+with a ports table, and search (`ip`, `host`, `vendor` or `port:22`). The map
+only shows responding hosts (toggle **Only responding**); addresses nmap assumed
+up without a reply are hidden.
 
 The **Scan** panel runs `nmap` in the background only after you press **Scan**
 (target, `-sV`, `-O`, timing; with a **Cancel** button and a verbose,
