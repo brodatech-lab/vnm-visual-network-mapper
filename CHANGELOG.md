@@ -15,6 +15,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
   canvas itself, connected to the node by a line. Multiple cards can stay open
   at once, cards are draggable too, and each closes via its **×** (top-right).
   The Inspector mirrors the last focused host.
+- Detail cards live in **world space**, so they scale and move together with the
+  map when zooming/panning (same as host nodes).
 
 ## [0.6.0] - 2026-10-09
 

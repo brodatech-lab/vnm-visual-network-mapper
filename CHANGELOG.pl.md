@@ -15,6 +15,8 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   rysowaną na canvasie, połączoną z węzłem linią. Wiele kart może być otwartych
   naraz, karty też można przeciągać, a każda zamyka się przez **×** (prawy górny
   róg). Inspector odzwierciedla ostatnio wybrany host.
+- Karty szczegółów są w **world space**, więc skalują się i przesuwają razem z
+  mapą przy zoomie/panie (tak samo jak bloki hostów).
 
 ## [0.6.0] - 2026-10-09
 

@@ -172,8 +172,8 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
     }
     for (auto& card : state.cards) {
         if (card.dragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            card.pos.x += io.MouseDelta.x;
-            card.pos.y += io.MouseDelta.y;
+            card.pos.x += io.MouseDelta.x / state.zoom;
+            card.pos.y += io.MouseDelta.y / state.zoom;
         }
     }
 
@@ -279,24 +279,22 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                       sub, subtitle_of(host).c_str());
     }
 
-    // ---- detail cards (drawn on the canvas, screen-space) ----
-    constexpr float kCardWidth = 320.0f;
+    // ---- detail cards (world-space, so they scale with zoom) ----
+    const float base = ImGui::GetFontSize();
+    const float card_font = clampf(base * state.zoom, 9.0f, 20.0f);
+    const float card_title = clampf((base + 3.0f) * state.zoom, 10.0f, 22.0f);
+    const float line_h_w = base + 3.0f;  // world units
+    const float pad_w = 12.0f;
+    const float title_h_w = base + 6.0f;
+    const float card_w_w = 320.0f;
+    const float close_pad = 6.0f;
+
     for (auto& card : state.cards) {
         if (card.host_index < 0 ||
             static_cast<std::size_t>(card.host_index) >= scan.hosts.size()) {
             continue;
         }
-        // clamp position into the canvas
-        card.pos.x = clampf(card.pos.x, canvas_p0.x + 4.0f,
-                            canvas_p0.x + canvas_sz.x - kCardWidth - 4.0f);
-        card.pos.y = clampf(card.pos.y, canvas_p0.y + 4.0f,
-                            canvas_p0.y + canvas_sz.y - 28.0f);
-
         const Host& host = scan.hosts[static_cast<std::size_t>(card.host_index)];
-        const float fs = ImGui::GetFontSize();
-        const float line_h = fs + 3.0f;
-        const float pad = 12.0f;
-        const float title_h = fs + 6.0f;
 
         std::vector<std::string> info;
         info.push_back("hostname: " +
@@ -310,15 +308,17 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
 
         const std::size_t max_ports = 10;
         const std::size_t shown = std::min(max_ports, host.ports.size());
-        float card_h = pad + title_h + 6.0f + static_cast<float>(info.size()) * line_h + pad;
+        float card_h_w =
+            pad_w + title_h_w + 6.0f + static_cast<float>(info.size()) * line_h_w + pad_w;
         if (!host.ports.empty()) {
-            card_h += 6.0f + line_h + static_cast<float>(shown) * line_h;
+            card_h_w += 6.0f + line_h_w + static_cast<float>(shown) * line_h_w;
             if (host.ports.size() > shown) {
-                card_h += line_h;
+                card_h_w += line_h_w;
             }
         }
-        const ImVec2 card_a = card.pos;
-        const ImVec2 card_b(card_a.x + kCardWidth, card_a.y + card_h);
+
+        const ImVec2 card_a = w2s(card.pos.x, card.pos.y);
+        const ImVec2 card_b = w2s(card.pos.x + card_w_w, card.pos.y + card_h_w);
 
         // connector from the node to the card
         for (const auto& n : layout.nodes) {
@@ -327,53 +327,58 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                 const ImVec2 node_anchor(
                     w2s(wp.x + config.node_width, wp.y + config.node_height * 0.5f));
                 draw->AddLine(node_anchor, ImVec2(card_a.x, (card_a.y + card_b.y) * 0.5f),
-                              IM_COL32(120, 130, 145, 170), 1.5f);
+                              IM_COL32(120, 130, 145, 170),
+                              std::max(1.0f, 1.5f * state.zoom));
                 break;
             }
         }
 
         draw->AddRectFilled(ImVec2(card_a.x + 3.0f, card_a.y + 3.0f),
                             ImVec2(card_b.x + 3.0f, card_b.y + 3.0f),
-                            IM_COL32(0, 0, 0, 90), 8.0f);
+                            IM_COL32(0, 0, 0, 80), 8.0f);
         draw->AddRectFilled(card_a, card_b, IM_COL32(34, 37, 45, 250), 8.0f);
-        draw->AddRect(card_a, card_b, risk_u32(host.risk), 8.0f, 0, 2.0f);
+        draw->AddRect(card_a, card_b, risk_u32(host.risk), 8.0f, 0,
+                      std::max(1.0f, 2.0f * state.zoom));
 
-        float y = card_a.y + pad;
-        draw->AddText(font, fs + 3.0f, ImVec2(card_a.x + pad, y),
+        float wy = card.pos.y + pad_w;
+        draw->AddText(font, card_title, w2s(card.pos.x + pad_w, wy),
                       IM_COL32(236, 239, 243, 255), host.address.c_str());
-        y += title_h;
+        wy += title_h_w;
         for (const auto& text : info) {
-            draw->AddText(font, fs, ImVec2(card_a.x + pad, y),
+            draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
                           IM_COL32(176, 184, 196, 255), text.c_str());
-            y += line_h;
+            wy += line_h_w;
         }
         if (!host.ports.empty()) {
-            y += 6.0f;
-            draw->AddText(font, fs, ImVec2(card_a.x + pad, y),
+            wy += 6.0f;
+            draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
                           IM_COL32(140, 150, 165, 255), "ports:");
-            y += line_h;
+            wy += line_h_w;
             for (std::size_t i = 0; i < shown; ++i) {
                 const Port& port = host.ports[i];
-                const std::string text = port.describe();
                 const ImU32 col = (port.state == "open") ? IM_COL32(210, 216, 224, 255)
                                                          : IM_COL32(130, 138, 150, 255);
-                draw->AddText(font, fs, ImVec2(card_a.x + pad, y), col, text.c_str());
-                y += line_h;
+                draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy), col,
+                              port.describe().c_str());
+                wy += line_h_w;
             }
             if (host.ports.size() > shown) {
                 const std::string more =
                     "+" + std::to_string(host.ports.size() - shown) + " more";
-                draw->AddText(font, fs, ImVec2(card_a.x + pad, y),
+                draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
                               IM_COL32(130, 138, 150, 255), more.c_str());
             }
         }
 
         card.rect_a = card_a;
         card.rect_b = card_b;
-        card.close_a = ImVec2(card_b.x - 22.0f, card_a.y + 5.0f);
-        card.close_b = ImVec2(card_b.x - 8.0f, card_a.y + 19.0f);
+        const float cs = clampf(16.0f * state.zoom, 10.0f, 28.0f);
+        card.close_a =
+            ImVec2(card_b.x - cs - close_pad * state.zoom, card_a.y + close_pad * state.zoom);
+        card.close_b =
+            ImVec2(card_b.x - close_pad * state.zoom, card_a.y + close_pad * state.zoom + cs);
         const bool close_hovered = point_in(io.MousePos, card.close_a, card.close_b);
-        draw->AddText(font, fs, ImVec2(card.close_a.x + 3.0f, card.close_a.y),
+        draw->AddText(font, card_font, ImVec2(card.close_a.x + 2.0f, card.close_a.y),
                       close_hovered ? IM_COL32(236, 239, 243, 255)
                                     : IM_COL32(150, 158, 170, 255),
                       "x");
@@ -430,13 +435,11 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                     state.cards.erase(it);
                     state.cards.push_back(card);
                 } else {
-                    ImVec2 pos(canvas_p0.x + 40.0f, canvas_p0.y + 40.0f);
+                    ImVec2 pos(0.0f, 0.0f);
                     for (const auto& n : layout.nodes) {
                         if (static_cast<int>(n.host_index) == host_index) {
                             const ImVec2 wp = node_world(n);
-                            const ImVec2 screen = w2s(wp.x, wp.y);
-                            pos = ImVec2(screen.x + config.node_width * state.zoom + 20.0f,
-                                         screen.y);
+                            pos = ImVec2(wp.x + config.node_width + 20.0f, wp.y);
                             break;
                         }
                     }
