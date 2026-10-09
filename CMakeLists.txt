@@ -40,6 +40,7 @@ add_library(vnm_core STATIC
     src/core/export.cpp
     src/core/json.cpp
     src/core/links.cpp
+    src/core/live.cpp
     src/core/stb_impl.cpp)
 
 target_include_directories(vnm_core PRIVATE

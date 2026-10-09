@@ -45,6 +45,7 @@
 #include "vnm/export.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/links.hpp"
+#include "vnm/live.hpp"
 #include "vnm/model.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
@@ -384,121 +385,6 @@ bool open_in_shell(ImGuiContext*, const char* url) {
 #endif
 }
 
-int find_or_add_host(vnm::Scan& scan, const std::string& ip) {
-    if (ip.empty()) {
-        return -1;
-    }
-    for (std::size_t i = 0; i < scan.hosts.size(); ++i) {
-        if (scan.hosts[i].address == ip) {
-            return static_cast<int>(i);
-        }
-    }
-    vnm::Host host;
-    host.address = ip;
-    host.status = vnm::HostStatus::Up;
-    host.status_reason = "live";
-    host.subnet = vnm::subnet_of(ip, 24);
-    scan.hosts.push_back(std::move(host));
-    return static_cast<int>(scan.hosts.size()) - 1;
-}
-
-void add_open_port(vnm::Host& host, int number, const std::string& proto) {
-    for (auto& port : host.ports) {
-        if (port.number == number && port.protocol == proto) {
-            port.state = "open";
-            return;
-        }
-    }
-    vnm::Port port;
-    port.number = static_cast<std::uint16_t>(number);
-    port.protocol = proto;
-    port.state = "open";
-    host.ports.push_back(std::move(port));
-}
-
-/// Update `live` from one line of nmap's normal output. This is streamed live
-/// on every platform, unlike nmap's XML file which may stay locked/mid-write.
-void feed_live_output(vnm::Scan& live, int& current, const std::string& line) {
-    if (line.rfind("Nmap scan report for ", 0) == 0) {
-        std::string rest = line.substr(21);
-        std::string ip = rest;
-        const std::size_t l = rest.find('(');
-        if (l != std::string::npos) {
-            const std::size_t r = rest.find(')', l);
-            if (r != std::string::npos) {
-                ip = rest.substr(l + 1, r - l - 1);
-            }
-        } else {
-            const std::size_t sp = rest.find(' ');
-            if (sp != std::string::npos) {
-                ip = rest.substr(0, sp);
-            }
-        }
-        current = find_or_add_host(live, ip);
-        return;
-    }
-    if (current < 0 || static_cast<std::size_t>(current) >= live.hosts.size()) {
-        return;
-    }
-    vnm::Host& host = live.hosts[static_cast<std::size_t>(current)];
-
-    if (line.rfind("Host is up", 0) == 0) {
-        host.status = vnm::HostStatus::Up;
-        return;
-    }
-    if (line.rfind("MAC Address: ", 0) == 0) {
-        const std::string rest = line.substr(13);
-        const std::size_t sp = rest.find(' ');
-        host.mac = (sp == std::string::npos) ? rest : rest.substr(0, sp);
-        const std::size_t lp = rest.find('(');
-        if (lp != std::string::npos) {
-            const std::size_t rp = rest.find(')', lp);
-            if (rp != std::string::npos) {
-                host.vendor = rest.substr(lp + 1, rp - lp - 1);
-            }
-        }
-        return;
-    }
-    if (line.rfind("Discovered open port ", 0) == 0) {
-        const std::string rest = line.substr(21);
-        const std::size_t slash = rest.find('/');
-        const std::size_t on = rest.find(" on ");
-        if (slash != std::string::npos && on != std::string::npos && on > slash) {
-            const int number = std::atoi(rest.substr(0, slash).c_str());
-            const std::string proto = rest.substr(slash + 1, on - slash - 1);
-            const int idx = find_or_add_host(live, rest.substr(on + 4));
-            if (idx >= 0) {
-                add_open_port(live.hosts[static_cast<std::size_t>(idx)], number, proto);
-            }
-        }
-        return;
-    }
-    // Port table line, e.g. "22/tcp   open  ssh     OpenSSH 8.9p1".
-    if (!line.empty() && std::isdigit(static_cast<unsigned char>(line[0]))) {
-        const std::size_t slash = line.find('/');
-        if (slash == std::string::npos) {
-            return;
-        }
-        const int number = std::atoi(line.substr(0, slash).c_str());
-        std::istringstream is(line.substr(slash + 1));
-        std::string proto;
-        std::string state;
-        std::string service;
-        is >> proto >> state >> service;
-        add_open_port(host, number, proto);
-        for (auto& port : host.ports) {
-            if (port.number == number && port.protocol == proto) {
-                if (!state.empty()) {
-                    port.state = state;
-                }
-                if (!service.empty()) {
-                    port.service = service;
-                }
-                break;
-            }
-        }
-    }
-}
 
 /// Background nmap job: the runner runs on its own thread so the UI stays live.
 struct ScanJob {
@@ -511,8 +397,7 @@ struct ScanJob {
     std::string error;
     std::string task;          // current nmap task (for the progress display)
     int percent{-1};
-    vnm::Scan live;            // hosts/ports built from the streamed output
-    int live_host{-1};
+    vnm::LiveOutputParser live_parser; // hosts/ports from the streamed output
     std::size_t last_sig{0};   // signature of the last applied live parse
     std::chrono::steady_clock::time_point last_live{};
     int exit_code{-1};
@@ -901,7 +786,7 @@ void poll_scan(App& app) {
                 is_last ? chunk.substr(start) : chunk.substr(start, nl - start);
             if (!line.empty()) {
                 log_line(app, line);
-                feed_live_output(job->live, job->live_host, line);
+                job->live_parser.feed_line(line);
             }
             if (is_last) {
                 break;
@@ -910,10 +795,11 @@ void poll_scan(App& app) {
         }
 
         // Fold newly discovered hosts/ports onto the canvas right away.
-        const std::size_t sig = scan_signature(job->live);
-        if (!job->live.hosts.empty() && sig != job->last_sig) {
+        const vnm::Scan& live = job->live_parser.scan();
+        const std::size_t sig = scan_signature(live);
+        if (!live.hosts.empty() && sig != job->last_sig) {
             job->last_sig = sig;
-            apply_live_scan(app, job->live);
+            apply_live_scan(app, live);
             log_line(app, "live: " + std::to_string(app.scan.host_count()) + " host(s)");
         }
     }

@@ -49,10 +49,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - Inspector: duplicate ImGui IDs when several ports showed the same link labels
   (SpeedGuide/IANA/Shodan/…). Link widgets are now wrapped in unique `PushID`
   scopes.
+- Live map: hosts reported as `[host down]` are no longer added, so starting a
+  scan no longer floods the canvas with every address in the range (it now
+  matches the final result).
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.
 - New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
+- New `vnm/live.hpp` module (`LiveOutputParser`): the streamed-nmap-output
+  parser used for live map building, now unit-tested (`test_live`).
 - **Live map building**: while a scan runs, nmap's streamed output is parsed
   line by line (host reports, discovered open ports, service table) and
   discovered hosts/ports appear on the canvas in real time — on every platform.
