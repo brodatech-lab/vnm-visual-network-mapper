@@ -43,6 +43,74 @@
 
 namespace {
 
+/// Single-quote a string for /bin/sh.
+std::string shell_quote(const std::string& value) {
+    std::string out = "'";
+    for (const char c : value) {
+        if (c == '\'') {
+            out += "'\\''";
+        } else {
+            out.push_back(c);
+        }
+    }
+    out.push_back('\'');
+    return out;
+}
+
+bool run_command(const std::string& command, bool background) {
+    std::string full = command + " >/dev/null 2>&1";
+    if (background) {
+        full += " &";
+    }
+    return std::system(full.c_str()) == 0;
+}
+
+/// Open a URL/ file in the user's default browser (used by ImGui's link
+/// widgets and the canvas chips).
+bool open_in_shell(ImGuiContext*, const char* url) {
+    if (url == nullptr || *url == '\0') {
+        return false;
+    }
+    const std::string quoted = shell_quote(std::string(url));
+
+    if (const char* browser = std::getenv("BROWSER");
+        browser != nullptr && *browser != '\0') {
+        if (run_command(shell_quote(std::string(browser)) + " " + quoted, true)) {
+            return true;
+        }
+    }
+    if (run_command("gio open " + quoted, false)) {
+        return true;
+    }
+    if (run_command("xdg-open " + quoted, false)) {
+        return true;
+    }
+    // Ask for the default web browser desktop entry and launch it explicitly.
+    if (FILE* pipe = ::popen("xdg-settings get default-web-browser 2>/dev/null", "r")) {
+        char buffer[256] = {};
+        const bool got = std::fgets(buffer, sizeof(buffer), pipe) != nullptr;
+        ::pclose(pipe);
+        if (got) {
+            std::string name(buffer);
+            while (!name.empty() &&
+                   (name.back() == '\n' || name.back() == '\r' || name.back() == ' ')) {
+                name.pop_back();
+            }
+            if (!name.empty() &&
+                run_command("gtk-launch " + shell_quote(name) + " " + quoted, false)) {
+                return true;
+            }
+        }
+    }
+    for (const char* candidate :
+         {"firefox", "firefox-esr", "chromium", "google-chrome", "brave-browser"}) {
+        if (run_command(std::string(candidate) + " " + quoted, true)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Background nmap job: the runner runs on its own thread so the UI stays live.
 struct ScanJob {
     std::thread thread;
@@ -1171,6 +1239,7 @@ int main(int argc, char** argv) {
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImGui::GetPlatformIO().Platform_OpenInShellFn = open_in_shell;
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;

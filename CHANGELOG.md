@@ -32,6 +32,10 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - MAC vendor lookup link (maclookup.app) next to the host MAC address.
 - Clicking a canvas chip also writes the URL to the Log, so it can be copied
   when no browser is installed.
+- Link opening uses a fallback chain (`$BROWSER` → `gio open` → `xdg-open` →
+  default `.desktop` via `gtk-launch` → known browsers) so links open in the
+  user's default browser. Run the GUI as your normal user (not root) for this
+  to work.
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.

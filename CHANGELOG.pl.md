@@ -34,6 +34,10 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - Link do sprawdzenia vendora po MAC (maclookup.app) obok adresu MAC hosta.
 - Kliknięcie chipa na canvasie zapisuje też URL do Logu, by można go było
   skopiować, gdy nie ma zainstalowanej przeglądarki.
+- Otwieranie linków używa łańcucha fallbacków (`$BROWSER` → `gio open` →
+  `xdg-open` → domyślny `.desktop` przez `gtk-launch` → znane przeglądarki), więc
+  linki otwierają się w domyślnej przeglądarce. Uruchamiaj GUI jako zwykły
+  użytkownik (nie root), by to działało.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
   (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
   wykrywane.
