@@ -906,27 +906,6 @@ void draw_inspector(App& app) {
     ImGui::End();
 }
 
-/// Floating "node" attached to the clicked host, mirroring the inspector data.
-void draw_host_popup(App& app) {
-    const int sel = app.view.selected;
-    if (sel < 0 || static_cast<std::size_t>(sel) >= app.scan.hosts.size()) {
-        return;
-    }
-    bool open = true;
-    ImGui::SetNextWindowPos(app.view.selected_screen, ImGuiCond_Always);
-    ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(340.0f, 10000.0f));
-    const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize |
-                                   ImGuiWindowFlags_NoDocking |
-                                   ImGuiWindowFlags_NoSavedSettings |
-                                   ImGuiWindowFlags_NoCollapse;
-    ImGui::Begin("Host###host_node", &open, flags);
-    draw_host_details(app.scan.hosts[static_cast<std::size_t>(sel)]);
-    ImGui::End();
-    if (!open) {
-        app.view.selected = -1;
-    }
-}
-
 void do_export(App& app, const char* ext) {
     const std::string path = std::string(app.export_buf) + "." + ext;
     const vnm::ExportFormat format = vnm::parse_format(ext);
@@ -1112,7 +1091,6 @@ int main(int argc, char** argv) {
         draw_passive_panel(app);
         draw_canvas(app);
         draw_inspector(app);
-        draw_host_popup(app);
         draw_data(app);
         draw_log(app);
 

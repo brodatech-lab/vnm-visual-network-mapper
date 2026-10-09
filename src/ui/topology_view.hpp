@@ -14,7 +14,14 @@ struct TopologyViewState {
     ImVec2 pan{0.0f, 0.0f};
     bool fit_requested{true};
     int selected{-1};      // index into scan.hosts, -1 = none
-    ImVec2 selected_screen{0.0f, 0.0f}; // screen anchor of the selected node
+    // Screen-space geometry of the selected node and of the drawn detail card
+    // (used for the connector, external click handling and the close button).
+    ImVec2 selected_node_a{0.0f, 0.0f};
+    ImVec2 selected_node_b{0.0f, 0.0f};
+    ImVec2 detail_rect_a{0.0f, 0.0f};
+    ImVec2 detail_rect_b{0.0f, 0.0f};
+    ImVec2 detail_close_a{0.0f, 0.0f};
+    ImVec2 detail_close_b{0.0f, 0.0f};
     std::string search;    // filter query ("", "192.168", "port:22")
 };
 

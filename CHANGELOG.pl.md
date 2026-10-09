@@ -10,9 +10,11 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 ### Dodane
 
-- Canvas: kliknięcie w blok hosta otwiera zakotwiczoną przy nim pływającą nodę
-  z tymi samymi danymi co Inspector (IP/MAC/vendor/OS/status/ryzyko + tabela
-  portów). Zamknięcie nody odznacza host.
+- Canvas: kliknięcie w blok hosta rysuje kartę szczegółów **bezpośrednio na
+  canvasie**, połączoną z węzłem linią, z tymi samymi danymi co Inspector
+  (IP/MAC/vendor/OS/status/ryzyko + lista portów). **×** na karcie odznacza
+  hosta. Canvas ma obsługę hit-testu klikalnego tekstu (kursor „łapka") pod
+  przyszłe linki.
 
 ## [0.6.0] - 2026-10-09
 

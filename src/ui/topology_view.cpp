@@ -194,7 +194,8 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             (state.selected == static_cast<int>(node.host_index)) ? 3.0f : 1.8f;
         draw->AddRect(a, b, border, 6.0f, 0, thickness);
         if (state.selected == static_cast<int>(node.host_index)) {
-            state.selected_screen = ImVec2(b.x + 16.0f, a.y);
+            state.selected_node_a = a;
+            state.selected_node_b = b;
         }
 
         draw->AddText(font, font_size, ImVec2(a.x + 10.0f * state.zoom + 2.0f, a.y + 6.0f * state.zoom + 2.0f),
@@ -213,6 +214,107 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                       ImVec2(a.x + 10.0f * state.zoom + 2.0f,
                              a.y + 6.0f * state.zoom + 2.0f + font_size + 3.0f),
                       subtitle, detail);
+    }
+
+    // detail card for the selected host (drawn on the canvas itself)
+    state.detail_rect_a = ImVec2(-1.0f, -1.0f);
+    state.detail_rect_b = ImVec2(-1.0f, -1.0f);
+    if (state.selected >= 0 &&
+        static_cast<std::size_t>(state.selected) < scan.hosts.size() &&
+        state.selected_node_b.x > state.selected_node_a.x) {
+        const Host& host = scan.hosts[static_cast<std::size_t>(state.selected)];
+        const float card_w = 320.0f;
+        const float fs = ImGui::GetFontSize();
+        const float line_h = fs + 3.0f;
+        const float pad = 12.0f;
+        const float title_h = fs + 6.0f;
+
+        std::vector<std::string> info;
+        info.push_back("hostname: " +
+                       (host.hostname.empty() ? std::string("-") : host.hostname));
+        info.push_back("vendor:   " + (host.vendor.empty() ? std::string("-") : host.vendor));
+        info.push_back("mac:      " + (host.mac.empty() ? std::string("-") : host.mac));
+        info.push_back("os:       " + (host.os_name.empty() ? std::string("-") : host.os_name));
+        info.push_back("status:   " + std::string(vnm::to_string(host.status)) +
+                       (host.status_reason.empty() ? "" : " (" + host.status_reason + ")"));
+        info.push_back("risk:     " + std::string(vnm::to_string(host.risk)));
+
+        const std::size_t max_ports = 10;
+        const std::size_t shown = std::min(max_ports, host.ports.size());
+        float card_h = pad + title_h + 6.0f + static_cast<float>(info.size()) * line_h + pad;
+        if (!host.ports.empty()) {
+            card_h += 6.0f + line_h + static_cast<float>(shown) * line_h;
+            if (host.ports.size() > shown) {
+                card_h += line_h;
+            }
+        }
+
+        ImVec2 card_a(state.selected_node_b.x + 16.0f, state.selected_node_a.y);
+        if (card_a.x + card_w > canvas_p0.x + canvas_sz.x) {
+            card_a.x = state.selected_node_a.x - 16.0f - card_w;
+        }
+        card_a.x = std::max(card_a.x, canvas_p0.x + 4.0f);
+        card_a.y = std::max(card_a.y, canvas_p0.y + 4.0f);
+        card_a.y = std::min(card_a.y, canvas_p0.y + canvas_sz.y - card_h - 4.0f);
+        const ImVec2 card_b(card_a.x + card_w, card_a.y + card_h);
+
+        const ImVec2 node_anchor(state.selected_node_b.x,
+                                 (state.selected_node_a.y + state.selected_node_b.y) * 0.5f);
+        const ImVec2 card_anchor(card_a.x, card_a.y + card_h * 0.5f);
+        draw->AddLine(node_anchor, card_anchor, IM_COL32(120, 130, 145, 180), 1.5f);
+
+        draw->AddRectFilled(ImVec2(card_a.x + 3.0f, card_a.y + 3.0f),
+                            ImVec2(card_b.x + 3.0f, card_b.y + 3.0f),
+                            IM_COL32(0, 0, 0, 90), 8.0f);
+        draw->AddRectFilled(card_a, card_b, IM_COL32(34, 37, 45, 250), 8.0f);
+        draw->AddRect(card_a, card_b, risk_u32(host.risk), 8.0f, 0, 2.0f);
+
+        ImFont* card_font = ImGui::GetFont();
+        float y = card_a.y + pad;
+        draw->AddText(card_font, fs + 3.0f, ImVec2(card_a.x + pad, y),
+                      IM_COL32(236, 239, 243, 255), host.address.c_str());
+        y += title_h;
+        for (const auto& text : info) {
+            draw->AddText(card_font, fs, ImVec2(card_a.x + pad, y),
+                          IM_COL32(176, 184, 196, 255), text.c_str());
+            y += line_h;
+        }
+        if (!host.ports.empty()) {
+            y += 6.0f;
+            draw->AddText(card_font, fs, ImVec2(card_a.x + pad, y),
+                          IM_COL32(140, 150, 165, 255), "ports:");
+            y += line_h;
+            for (std::size_t i = 0; i < shown; ++i) {
+                const Port& port = host.ports[i];
+                const std::string text = port.describe();
+                const ImU32 col = (port.state == "open") ? IM_COL32(210, 216, 224, 255)
+                                                         : IM_COL32(130, 138, 150, 255);
+                draw->AddText(card_font, fs, ImVec2(card_a.x + pad, y), col, text.c_str());
+                y += line_h;
+            }
+            if (host.ports.size() > shown) {
+                const std::string more =
+                    "+" + std::to_string(host.ports.size() - shown) + " more";
+                draw->AddText(card_font, fs, ImVec2(card_a.x + pad, y),
+                              IM_COL32(130, 138, 150, 255), more.c_str());
+            }
+        }
+
+        state.detail_close_a = ImVec2(card_b.x - 22.0f, card_a.y + 5.0f);
+        state.detail_close_b = ImVec2(card_b.x - 8.0f, card_a.y + 19.0f);
+        const bool close_hovered =
+            ImGui::IsMouseHoveringRect(state.detail_close_a, state.detail_close_b);
+        draw->AddText(card_font, fs,
+                      ImVec2(state.detail_close_a.x + 3.0f, state.detail_close_a.y),
+                      close_hovered ? IM_COL32(236, 239, 243, 255)
+                                    : IM_COL32(150, 158, 170, 255),
+                      "x");
+        if (close_hovered) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        }
+
+        state.detail_rect_a = card_a;
+        state.detail_rect_b = card_b;
     }
 
     // minimap
@@ -248,21 +350,36 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
     // selection on click (no drag)
     if (hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
         io.MouseDragMaxDistanceSqr[0] < 36.0f) {
-        const float wx = (io.MousePos.x - canvas_p0.x - state.pan.x) / state.zoom;
-        const float wy = (io.MousePos.y - canvas_p0.y - state.pan.y) / state.zoom;
-        int picked = -1;
-        for (const auto& node : layout.nodes) {
-            if (wx >= node.x && wx <= node.x + config.node_width && wy >= node.y &&
-                wy <= node.y + config.node_height) {
-                picked = static_cast<int>(node.host_index);
-                const ImVec2 a = w2s(node.x, node.y);
-                const ImVec2 b =
-                    w2s(node.x + config.node_width, node.y + config.node_height);
-                state.selected_screen = ImVec2(b.x + 16.0f, a.y);
-                break;
+        const bool over_detail = state.detail_rect_b.x > state.detail_rect_a.x &&
+                                 io.MousePos.x >= state.detail_rect_a.x &&
+                                 io.MousePos.x <= state.detail_rect_b.x &&
+                                 io.MousePos.y >= state.detail_rect_a.y &&
+                                 io.MousePos.y <= state.detail_rect_b.y;
+        if (over_detail) {
+            const bool over_close = io.MousePos.x >= state.detail_close_a.x &&
+                                    io.MousePos.x <= state.detail_close_b.x &&
+                                    io.MousePos.y >= state.detail_close_a.y &&
+                                    io.MousePos.y <= state.detail_close_b.y;
+            if (over_close) {
+                state.selected = -1;
             }
+            // clicks inside the card never change the selection
+        } else {
+            const float wx = (io.MousePos.x - canvas_p0.x - state.pan.x) / state.zoom;
+            const float wy = (io.MousePos.y - canvas_p0.y - state.pan.y) / state.zoom;
+            int picked = -1;
+            for (const auto& node : layout.nodes) {
+                if (wx >= node.x && wx <= node.x + config.node_width && wy >= node.y &&
+                    wy <= node.y + config.node_height) {
+                    picked = static_cast<int>(node.host_index);
+                    state.selected_node_a = w2s(node.x, node.y);
+                    state.selected_node_b =
+                        w2s(node.x + config.node_width, node.y + config.node_height);
+                    break;
+                }
+            }
+            state.selected = picked;
         }
-        state.selected = picked;
     }
 
     return state.selected;

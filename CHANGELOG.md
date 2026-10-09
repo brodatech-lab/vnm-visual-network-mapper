@@ -10,9 +10,10 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Canvas: clicking a host block opens a floating node anchored to it, showing
-  the same details as the Inspector (IP/MAC/vendor/OS/status/risk + ports
-  table). Closing the node deselects the host.
+- Canvas: clicking a host block draws a detail card **on the canvas itself**,
+  connected to the node by a line, with the same data as the Inspector
+  (IP/MAC/vendor/OS/status/risk + ports list). The **×** on the card deselects.
+  The canvas supports clickable-text hit-testing (hand cursor) for future links.
 
 ## [0.6.0] - 2026-10-09
 
