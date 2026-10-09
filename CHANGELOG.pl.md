@@ -6,6 +6,31 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.4.0] - 2026-10-09
+
+Wieloplatformowość: wsparcie Windows (MSVC) obok Linuksa.
+
+### Dodane
+
+- Runner procesów dla Windows (`CreateProcess` + `CreatePipe`, nieblokujący
+  odczyt `PeekNamedPipe`/`ReadFile`, `TerminateProcess` dla anulowania, kody
+  wyjścia) pod `#ifdef _WIN32`; interfejs `LineCallback` bez zmian.
+- Detekcja interfejsów i tras na Windows przez `GetAdaptersAddresses` oraz
+  `GetIpForwardTable2` (IP Helper API), z MAC i nazwami przyjaznymi.
+- Domyślna ścieżka bazy na Windows: `%APPDATA%\vnm\storage.db`.
+- Przenośny helper `vnm::process_id()` (`getpid`/`_getpid`).
+- Cross-platform CMake: fallback amalgamacji SQLite przez FetchContent, GLFW
+  pobierany na Windows, link `ws2_32`/`iphlpapi`, MSVC `/utf-8` oraz preset
+  `windows-msvc`.
+- Workflow GitHub Actions budujący binarki Linux (GCC + `ctest`) i Windows
+  (MSVC) i dołączający je do GitHub Release.
+
+### Zmienione
+
+- Wersja projektu/CLI podniesiona do `0.4.0`.
+- Na Windows uruchamiaj jako Administrator dla `-sS`/`-O`/ARP; wymagany Nmap for
+  Windows (zawiera Npcap).
+
 ## [0.3.1] - 2026-10-09
 
 ### Dodane

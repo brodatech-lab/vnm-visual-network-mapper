@@ -20,13 +20,12 @@
 #include <thread>
 #include <vector>
 
-#include <unistd.h>
-
 #include "topology_view.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/model.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
+#include "vnm/platform.hpp"
 #include "vnm/scan.hpp"
 #include "vnm/storage.hpp"
 
@@ -179,7 +178,7 @@ void init_default_target(App& app) {
 std::string make_temp_xml() {
     const std::filesystem::path dir = std::filesystem::temp_directory_path();
     const std::string name =
-        "vnm_scan_" + std::to_string(::getpid()) + "_" +
+        "vnm_scan_" + std::to_string(vnm::process_id()) + "_" +
         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
         ".xml";
     return (dir / name).string();

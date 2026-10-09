@@ -7,7 +7,8 @@
 #include <vector>
 
 #if defined(_WIN32)
-#include <cstdio>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #else
 #include <poll.h>
 #include <signal.h>
@@ -45,8 +46,161 @@ std::vector<std::string> NmapRunner::build_argv(const ScanOptions& options) {
 
 #if defined(_WIN32)
 
-ProcessResult NmapRunner::run(const ScanOptions&, const LineCallback&) {
-    return ProcessResult{-1, false, "scan runner is not implemented on Windows yet"};
+namespace {
+
+/// Quote one argument for the Windows command line (CommandLineToArgvW rules).
+std::string quote_arg(const std::string& arg) {
+    if (!arg.empty() && arg.find_first_of(" \t\"") == std::string::npos) {
+        return arg;
+    }
+    std::string out = "\"";
+    std::size_t backslashes = 0;
+    for (const char c : arg) {
+        if (c == '\\') {
+            ++backslashes;
+        } else if (c == '"') {
+            out.append(backslashes * 2 + 1, '\\');
+            out.push_back('"');
+            backslashes = 0;
+        } else {
+            out.append(backslashes, '\\');
+            backslashes = 0;
+            out.push_back(c);
+        }
+    }
+    out.append(backslashes * 2, '\\');
+    out.push_back('"');
+    return out;
+}
+
+std::string build_command_line(const std::vector<std::string>& argv) {
+    std::string cmdline;
+    for (std::size_t i = 0; i < argv.size(); ++i) {
+        if (i != 0) {
+            cmdline.push_back(' ');
+        }
+        cmdline += quote_arg(argv[i]);
+    }
+    return cmdline;
+}
+
+} // namespace
+
+ProcessResult NmapRunner::run(const ScanOptions& options, const LineCallback& on_line) {
+    ProcessResult result;
+    cancelled_.store(false);
+
+    if (options.target.empty()) {
+        result.error = "no scan target supplied";
+        return result;
+    }
+
+    const std::vector<std::string> argv = build_argv(options);
+    std::string cmdline = build_command_line(argv);
+    std::vector<char> mutable_cmd(cmdline.begin(), cmdline.end());
+    mutable_cmd.push_back('\0');
+
+    SECURITY_ATTRIBUTES sa{};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+
+    HANDLE read_pipe = nullptr;
+    HANDLE write_pipe = nullptr;
+    if (!CreatePipe(&read_pipe, &write_pipe, &sa, 0)) {
+        result.error = "CreatePipe() failed";
+        return result;
+    }
+    SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdOutput = write_pipe;
+    startup.hStdError = write_pipe;
+
+    PROCESS_INFORMATION process{};
+    const BOOL created = CreateProcessA(
+        nullptr, mutable_cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+        nullptr, nullptr, &startup, &process);
+    CloseHandle(write_pipe);
+
+    if (!created) {
+        CloseHandle(read_pipe);
+        result.error = "nmap not found or not executable";
+        return result;
+    }
+
+    std::string buffer;
+    std::array<char, 8192> chunk{};
+
+    auto flush_lines = [&]() {
+        std::size_t pos = 0;
+        std::size_t nl = 0;
+        while ((nl = buffer.find('\n', pos)) != std::string::npos) {
+            std::string_view line = std::string_view(buffer).substr(pos, nl - pos);
+            if (!line.empty() && line.back() == '\r') {
+                line.remove_suffix(1);
+            }
+            if (on_line) {
+                on_line(line);
+            }
+            pos = nl + 1;
+        }
+        buffer.erase(0, pos);
+    };
+
+    for (;;) {
+        if (cancelled_.load()) {
+            TerminateProcess(process.hProcess, 1);
+        }
+
+        DWORD available = 0;
+        if (!PeekNamedPipe(read_pipe, nullptr, 0, nullptr, &available, nullptr)) {
+            break; // pipe closed
+        }
+
+        if (available > 0) {
+            DWORD read = 0;
+            if (!ReadFile(read_pipe, chunk.data(), static_cast<DWORD>(chunk.size()),
+                          &read, nullptr) ||
+                read == 0) {
+                break;
+            }
+            buffer.append(chunk.data(), read);
+            flush_lines();
+            continue;
+        }
+
+        const DWORD wait = WaitForSingleObject(process.hProcess, 100);
+        if (wait == WAIT_OBJECT_0) {
+            DWORD remaining = 0;
+            if (!PeekNamedPipe(read_pipe, nullptr, 0, nullptr, &remaining, nullptr) ||
+                remaining == 0) {
+                break;
+            }
+        }
+    }
+
+    if (!buffer.empty() && on_line) {
+        if (buffer.back() == '\r') {
+            buffer.pop_back();
+        }
+        on_line(buffer);
+    }
+
+    CloseHandle(read_pipe);
+    WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    GetExitCodeProcess(process.hProcess, &exit_code);
+    result.exit_code = static_cast<int>(exit_code);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+
+    result.cancelled = cancelled_.load();
+    if (result.cancelled && result.error.empty()) {
+        result.error = "scan cancelled";
+    }
+    return result;
 }
 
 #else

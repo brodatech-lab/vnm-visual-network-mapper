@@ -1,0 +1,89 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ pkg-config \
+            libsqlite3-dev libglfw3-dev libgl1-mesa-dev \
+            libx11-dev libxkbcommon-dev libwayland-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVNM_BUILD_GUI=ON
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/vnm dist/
+          cp build/src/ui/vnm_gui dist/
+          tar -C dist -czf vnm-linux-x86_64.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: vnm-linux-x86_64.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DVNM_BUILD_GUI=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/vnm.exe dist/
+          Copy-Item build/src/ui/Release/vnm_gui.exe dist/
+          Compress-Archive -Path dist/* -DestinationPath vnm-windows-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: vnm-windows-x86_64.zip
+
+  release:
+    needs: [linux, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/linux/vnm-linux-x86_64.tar.gz
+            artifacts/windows/vnm-windows-x86_64.zip
+          body: |
+            VNM release.
+
+            Linux: run `./vnm` or `./vnm_gui` (nmap required in PATH).
+            Windows: run `vnm.exe` / `vnm_gui.exe`. Requires Nmap for Windows
+            (which bundles Npcap); run as Administrator for `-sS`/`-O`/ARP scans.

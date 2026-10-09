@@ -6,27 +6,29 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.3.0` – natywny rdzeń (silnik + CLI), backend SQLite z historią
-> i diffingiem skanów oraz natywne GUI 2D (Dear ImGui docking) z mapą
-> pan/zoom i inspektorem.
+> **Status:** `v0.4.0` – natywny rdzeń (silnik + CLI), backend SQLite z historią
+> i diffingiem, natywne GUI 2D (Dear ImGui docking) oraz wsparcie **Windows +
+> Linux**.
 
 ## Dlaczego
 
 - Brak Electrona / web-stacka: start w ułamku sekundy, niskie zużycie RAM.
 - Automatyczne klastrowanie hostów w ramki podsieci `/24`.
 - Kolorystyka ryzyka: 🟢 bezpieczny · 🟡 uwaga · 🔴 krytyczny · ⚪ offline.
-- Jedna binarka, bez Node.js / Pythona / Dockera.
+- Jedna binarka na Linuksa i Windowsa, bez Node.js / Pythona / Dockera.
 
 ## Wymagania
 
-- Kompilator C++20 (GCC 13+ lub Clang 16+)
+- Kompilator C++20 (GCC 13+ / Clang 16+ na Linuksie; MSVC 2022 na Windows)
 - CMake ≥ 3.20
 - `nmap` w `PATH` (skanowanie)
-- Opcjonalnie: `nmap` + `setcap` dla detekcji OS / skanów SYN
-- GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany automatycznie przez CMake
-  FetchContent przy pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
+- Linux: opcjonalnie `setcap` dla detekcji OS / skanów SYN
+- Windows: **Nmap for Windows** (zawiera Npcap); uruchamiaj jako Administrator
+  dla `-sS`/`-O`/ARP, w przeciwnym razie użyj connect scan (`-sT`)
+- GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
+  pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
 
-## Szybki start
+## Szybki start (Linux)
 
 Instalacja zależności i konfiguracja środowiska (raz, wymaga sudo):
 
@@ -41,6 +43,19 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug -j
 ctest --test-dir build/debug --output-on-failure
 ```
+
+## Budowa na Windows
+
+Z Visual Studio 2022 (MSVC) i CMake:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DVNM_BUILD_GUI=ON
+cmake --build build --config Release --parallel
+# binarki: build\Release\vnm.exe oraz build\src\ui\Release\vnm_gui.exe
+```
+
+(albo preset `windows-msvc`). Gotowe `.exe`/binarki Linuksa produkuje workflow
+GitHub Actions przy tagach wersji.
 
 ## Użycie (CLI)
 
@@ -88,12 +103,13 @@ hostów). Wyniki zastępują mapę po zakończeniu skanu.
 include/vnm/        publiczne nagłówki API
 src/core/           rdzeń niezależny od GUI
   model.cpp         model danych + ocena ryzyka
-  net.cpp           auto-detekcja interfejsów (/sys/class/net, /proc/net/route)
-  scan.cpp          runner nmap (POSIX fork/exec + pipe, XML na żywo)
+  net.cpp           detekcja interfejsów (getifaddrs / GetAdaptersAddresses)
+  scan.cpp          runner nmap (POSIX fork/exec lub Windows CreateProcess)
   parse.cpp         bezzależnościowy parser XML Nmapa
   layout.cpp        klastrowanie podsieci /24 + układ siatki 2D
   diff.cpp          porównywanie skanów (added/removed/changed)
   storage.cpp       backend SQLite (scans/hosts/ports) + historia
+  platform.cpp      przenośne helpery (process id)
 src/cli/main.cpp    bootstrap CLI
 src/ui/             natywne GUI 2D (GLFW + OpenGL3 + Dear ImGui docking)
   main.cpp          aplikacja, dokowanie, panele Inspector/Data/Log
@@ -110,6 +126,7 @@ testowalna w izolacji i może być użyta zarówno przez CLI, jak i przyszły GU
 - [x] Auto-detekcja interfejsów i klastrowanie podsieci
 - [x] Backend SQLite (`~/.config/vnm/storage.db`) i diffing skanów
 - [x] GUI 2D (Dear ImGui): canvas, minimapa, inspector, docking
+- [x] Wsparcie Windows (MSVC) + buildy release przez GitHub Actions
 - [ ] Pasywne wykrywanie (libpcap), eksport SVG/PNG/PDF
 
 ## Licencja

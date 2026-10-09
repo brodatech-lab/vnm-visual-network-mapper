@@ -4,8 +4,7 @@
 #include <filesystem>
 #include <string>
 
-#include <unistd.h>
-
+#include "vnm/platform.hpp"
 #include "vnm/storage.hpp"
 
 namespace {
@@ -47,7 +46,7 @@ int main() {
 
     const std::filesystem::path db_path =
         std::filesystem::temp_directory_path() /
-        ("vnm_storage_test_" + std::to_string(::getpid()) + ".db");
+        ("vnm_storage_test_" + std::to_string(vnm::process_id()) + ".db");
     std::filesystem::remove(db_path);
 
     {

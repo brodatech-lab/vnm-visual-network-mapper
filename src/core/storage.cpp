@@ -134,6 +134,19 @@ Storage::~Storage() {
 }
 
 std::string Storage::default_path() {
+#if defined(_WIN32)
+    if (const char* appdata = std::getenv("APPDATA")) {
+        if (*appdata != '\0') {
+            return std::string(appdata) + "\\vnm\\storage.db";
+        }
+    }
+    if (const char* profile = std::getenv("USERPROFILE")) {
+        if (*profile != '\0') {
+            return std::string(profile) + "\\.vnm\\storage.db";
+        }
+    }
+    return "storage.db";
+#else
     if (const char* xdg = std::getenv("XDG_CONFIG_HOME")) {
         if (*xdg != '\0') {
             return std::string(xdg) + "/vnm/storage.db";
@@ -145,6 +158,7 @@ std::string Storage::default_path() {
         }
     }
     return "./storage.db";
+#endif
 }
 
 bool Storage::is_open() const noexcept { return db_ != nullptr; }

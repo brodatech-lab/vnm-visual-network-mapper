@@ -6,27 +6,29 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.3.0` – native core (engine + CLI), an SQLite backend with scan
-> history and diffing, and a native 2D GUI (Dear ImGui docking) with pan/zoom
-> topology map and inspector.
+> **Status:** `v0.4.0` – native core (engine + CLI), an SQLite backend with scan
+> history and diffing, a native 2D GUI (Dear ImGui docking) and **Windows +
+> Linux** support.
 
 ## Why
 
 - No Electron / web stack: sub-second startup, low RAM usage.
 - Automatic clustering of hosts into `/24` subnet frames.
 - Risk colouring: 🟢 safe · 🟡 warning · 🔴 critical · ⚪ offline.
-- A single binary, no Node.js / Python / Docker.
+- A single binary on Linux and Windows, no Node.js / Python / Docker.
 
 ## Requirements
 
-- C++20 compiler (GCC 13+ or Clang 16+)
+- C++20 compiler (GCC 13+ / Clang 16+ on Linux; MSVC 2022 on Windows)
 - CMake ≥ 3.20
 - `nmap` in `PATH` (scanning)
-- Optional: `nmap` + `setcap` for OS detection / SYN scans
-- GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched automatically via CMake
-  FetchContent on first GUI configure, so a network connection is required once)
+- Linux: optional `setcap` for OS detection / SYN scans
+- Windows: **Nmap for Windows** (bundles Npcap); run as Administrator for
+  `-sS`/`-O`/ARP scans, otherwise use a connect scan (`-sT`)
+- GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
+  first GUI configure, so a network connection is needed once)
 
-## Quick start
+## Quick start (Linux)
 
 Install dependencies and configure the environment (once, requires sudo):
 
@@ -41,6 +43,19 @@ cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
 cmake --build build/debug -j
 ctest --test-dir build/debug --output-on-failure
 ```
+
+## Build on Windows
+
+With Visual Studio 2022 (MSVC) and CMake:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DVNM_BUILD_GUI=ON
+cmake --build build --config Release --parallel
+# binaries: build\Release\vnm.exe and build\src\ui\Release\vnm_gui.exe
+```
+
+(or use the `windows-msvc` preset). Prebuilt `.exe`/Linux binaries are produced
+by the GitHub Actions release workflow on version tags.
 
 ## Usage (CLI)
 
@@ -87,12 +102,13 @@ ports, per-host reports). Results replace the map when the scan finishes.
 include/vnm/        public API headers
 src/core/           GUI-independent core
   model.cpp         data model + risk assessment
-  net.cpp           interface auto-detection (/sys/class/net, /proc/net/route)
-  scan.cpp          nmap runner (POSIX fork/exec + pipe, live XML)
+  net.cpp           interface detection (getifaddrs / GetAdaptersAddresses)
+  scan.cpp          nmap runner (POSIX fork/exec or Windows CreateProcess)
   parse.cpp         dependency-free Nmap XML parser
   layout.cpp        /24 subnet clustering + 2D grid layout
   diff.cpp          scan comparison (added/removed/changed)
   storage.cpp       SQLite backend (scans/hosts/ports) + history
+  platform.cpp      portable helpers (process id)
 src/cli/main.cpp    CLI bootstrap
 src/ui/             native 2D GUI (GLFW + OpenGL3 + Dear ImGui docking)
   main.cpp          app, docking layout, Inspector/Data/Log panels
@@ -109,6 +125,7 @@ isolation and can be reused by both the CLI and the future GUI.
 - [x] Interface auto-detection and subnet clustering
 - [x] SQLite backend (`~/.config/vnm/storage.db`) and scan diffing
 - [x] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
+- [x] Windows support (MSVC) + GitHub Actions release builds
 - [ ] Passive discovery (libpcap), SVG/PNG/PDF export
 
 ## License

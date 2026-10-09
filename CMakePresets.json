@@ -31,6 +31,16 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "windows-msvc",
+            "displayName": "Windows MSVC x64",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/windows-msvc",
+            "cacheVariables": {
+                "VNM_BUILD_GUI": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -41,6 +51,11 @@
         {
             "name": "release",
             "configurePreset": "release"
+        },
+        {
+            "name": "windows-msvc",
+            "configurePreset": "windows-msvc",
+            "configuration": "Release"
         }
     ],
     "testPresets": [
