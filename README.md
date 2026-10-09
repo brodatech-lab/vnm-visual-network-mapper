@@ -69,11 +69,17 @@ cmake --build build/debug -j
 ./build/debug/src/ui/vnm_gui --demo          # built-in sample topology
 ./build/debug/src/ui/vnm_gui scan.xml        # load an Nmap XML file
 ./build/debug/src/ui/vnm_gui --id 1          # load scan #1 from the database
+./build/debug/src/ui/vnm_gui --scan 192.168.0.1/24   # start a scan immediately
 ```
 
-Features: docked panels (Canvas / Inspector / Data / Log), pan & zoom, fit to
-view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
+Features: docked panels (Canvas / Inspector / Scan / Data / Log), pan & zoom, fit
+to view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
 with a ports table, and search (`ip`, `host`, `vendor` or `port:22`).
+
+The **Scan** panel runs `nmap` in the background only after you press **Scan**
+(target, `-sV`, `-O`, timing; with a **Cancel** button and a verbose,
+human-readable log of nmap's native output — initiating scans, discovered open
+ports, per-host reports). Results replace the map when the scan finishes.
 
 ## Architecture
 

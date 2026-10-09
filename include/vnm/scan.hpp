@@ -12,6 +12,9 @@ namespace vnm {
 struct ScanOptions {
     std::string target;                          // e.g. 192.168.1.0/24
     std::string nmap_path{"nmap"};               // resolved via PATH
+    std::string xml_path;                        // if set, write XML here and
+                                                 // stream nmap's normal output
+                                                 // instead (readable live log)
     std::vector<std::string> extra_args;         // appended verbatim
     bool service_detection{true};                // -sV
     bool os_detection{false};                    // -O (needs privileges)

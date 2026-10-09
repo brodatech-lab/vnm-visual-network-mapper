@@ -5,21 +5,46 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_internal.h"
 
+#include <atomic>
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
+
+#include <unistd.h>
 
 #include "topology_view.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/model.hpp"
+#include "vnm/net.hpp"
 #include "vnm/parse.hpp"
+#include "vnm/scan.hpp"
 #include "vnm/storage.hpp"
 
 namespace {
+
+/// Background nmap job: the runner runs on its own thread so the UI stays live.
+struct ScanJob {
+    std::thread thread;
+    vnm::NmapRunner runner;
+    std::atomic<bool> finished{false};
+    std::mutex mtx;
+    std::string pending_log;   // human-readable events, drained by the UI thread
+    std::string xml_path;      // temp file with nmap -oX output
+    std::string error;
+    std::string task;          // current nmap task (for the progress display)
+    int percent{-1};
+    int exit_code{-1};
+};
 
 struct App {
     GLFWwindow* window{nullptr};
@@ -35,9 +60,19 @@ struct App {
     char xml_path_buf[512]{};
     char db_path_buf[512]{};
     int db_id{1};
+
+    std::unique_ptr<ScanJob> scan_job;
+    char target_buf[128]{};
+    bool opt_service{true};
+    bool opt_os{false};
+    int opt_timing{4};
+    std::chrono::steady_clock::time_point scan_start;
 };
 
 void log_line(App& app, const std::string& message) {
+    if (std::getenv("VNM_DEBUG_LOG") != nullptr) {
+        std::fprintf(stderr, "[log] %s\n", message.c_str());
+    }
     app.log.push_back(message);
     if (app.log.size() > 1000) {
         app.log.erase(app.log.begin(), app.log.begin() + 200);
@@ -131,6 +166,155 @@ bool load_db(App& app, const std::string& path, int id) {
     return true;
 }
 
+void init_default_target(App& app) {
+    for (const auto& iface : vnm::NetInfo::interfaces()) {
+        if (!iface.loopback && iface.has_ipv4 && !iface.cidr.empty()) {
+            std::snprintf(app.target_buf, sizeof(app.target_buf), "%s", iface.cidr.c_str());
+            return;
+        }
+    }
+    std::snprintf(app.target_buf, sizeof(app.target_buf), "%s", "192.168.0.1/24");
+}
+
+std::string make_temp_xml() {
+    const std::filesystem::path dir = std::filesystem::temp_directory_path();
+    const std::string name =
+        "vnm_scan_" + std::to_string(::getpid()) + "_" +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+        ".xml";
+    return (dir / name).string();
+}
+
+void start_scan(App& app) {
+    if (app.scan_job) {
+        return;
+    }
+    const std::string target = app.target_buf;
+    if (target.empty()) {
+        log_line(app, "error: empty scan target");
+        return;
+    }
+
+    vnm::ScanOptions options;
+    options.target = target;
+    options.service_detection = app.opt_service;
+    options.os_detection = app.opt_os;
+    options.timing = app.opt_timing;
+    options.xml_path = make_temp_xml();  // XML to file -> normal text stays live
+    options.extra_args.push_back("-v");  // verbose: discovery/open-port messages
+    options.extra_args.push_back("--stats-every");
+    options.extra_args.push_back("5s");
+
+    auto job = std::make_unique<ScanJob>();
+    ScanJob* raw = job.get();
+    raw->xml_path = options.xml_path;
+    app.scan_start = std::chrono::steady_clock::now();
+    log_line(app, "Scan started: " + target);
+
+    raw->thread = std::thread([raw, options]() {
+        auto emit = [raw](const std::string& message) {
+            std::lock_guard<std::mutex> lock(raw->mtx);
+            raw->pending_log.append(message);
+            raw->pending_log.push_back('\n');
+        };
+        auto set_progress = [raw](const std::string& task) {
+            std::lock_guard<std::mutex> lock(raw->mtx);
+            raw->task = task;
+            raw->percent = -1;
+        };
+
+        const vnm::ProcessResult result = raw->runner.run(
+            options, [&](std::string_view line_view) {
+                std::string line(line_view);
+                while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+                    line.pop_back();
+                }
+                if (line.empty()) {
+                    return;
+                }
+                if (line.rfind("Stats:", 0) == 0) {
+                    set_progress(line); // live "Stats: ... hosts completed ..."
+                }
+                emit(line);
+            });
+
+        {
+            std::lock_guard<std::mutex> lock(raw->mtx);
+            raw->error = result.error;
+            raw->task.clear();
+            raw->percent = -1;
+        }
+        raw->exit_code = result.exit_code;
+        raw->finished.store(true);
+    });
+
+    app.scan_job = std::move(job);
+}
+
+void poll_scan(App& app) {
+    if (!app.scan_job) {
+        return;
+    }
+    ScanJob* job = app.scan_job.get();
+
+    {
+        std::string chunk;
+        {
+            std::lock_guard<std::mutex> lock(job->mtx);
+            chunk.swap(job->pending_log);
+        }
+        std::size_t start = 0;
+        while (start < chunk.size()) {
+            const std::size_t nl = chunk.find('\n', start);
+            if (nl == std::string::npos) {
+                log_line(app, chunk.substr(start));
+                break;
+            }
+            if (nl > start) {
+                log_line(app, chunk.substr(start, nl - start));
+            }
+            start = nl + 1;
+        }
+    }
+
+    if (!job->finished.load()) {
+        return;
+    }
+    if (job->thread.joinable()) {
+        job->thread.join();
+    }
+
+    const std::string error = job->error;
+    std::string xml;
+    if (!job->xml_path.empty()) {
+        std::ifstream in(job->xml_path, std::ios::binary);
+        if (in) {
+            std::ostringstream ss;
+            ss << in.rdbuf();
+            xml = ss.str();
+        }
+        std::error_code ec;
+        std::filesystem::remove(job->xml_path, ec);
+    }
+    if (!error.empty()) {
+        log_line(app, "scan error: " + error);
+    }
+    if (!xml.empty()) {
+        vnm::Scan scan = vnm::NmapXmlParser::parse(xml);
+        if (scan.hosts.empty() && scan.nmap_version.empty()) {
+            log_line(app, "error: could not parse scan output");
+        } else {
+            const std::size_t hosts = scan.host_count();
+            app.scan = std::move(scan);
+            log_line(app, "Scan finished: " + std::to_string(hosts) + " host(s)");
+            refresh(app);
+        }
+    } else {
+        log_line(app, "scan produced no output");
+    }
+    app.scan_job.reset();
+}
+
 void build_dockspace(App& app) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->WorkPos);
@@ -156,13 +340,17 @@ void build_dockspace(App& app) {
         ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspace_id, vp->WorkSize);
         ImGuiID center = dockspace_id;
-        ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.32f,
+        ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.34f,
                                                     nullptr, &center);
+        ImGuiID right_top = 0;
+        ImGuiID right_bottom = 0;
+        ImGui::DockBuilderSplitNode(right, ImGuiDir_Up, 0.50f, &right_top, &right_bottom);
         ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.26f,
                                                      nullptr, &center);
+        ImGui::DockBuilderDockWindow("Scan", right_top);
+        ImGui::DockBuilderDockWindow("Inspector", right_bottom);
+        ImGui::DockBuilderDockWindow("Data", right_bottom);
         ImGui::DockBuilderDockWindow("Canvas", center);
-        ImGui::DockBuilderDockWindow("Inspector", right);
-        ImGui::DockBuilderDockWindow("Data", right);
         ImGui::DockBuilderDockWindow("Log", bottom);
         ImGui::DockBuilderFinish(dockspace_id);
     }
@@ -185,6 +373,70 @@ void build_dockspace(App& app) {
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
+    }
+    ImGui::End();
+}
+
+void draw_scan_panel(App& app) {
+    ImGui::Begin("Scan");
+    const bool running = app.scan_job != nullptr;
+
+    ImGui::TextWrapped("Enter a target and press Scan. The scan runs in the "
+                       "background; results replace the current map.");
+    ImGui::InputTextWithHint("##target", "192.168.0.1/24", app.target_buf,
+                             sizeof(app.target_buf));
+    ImGui::Checkbox("Service detection (-sV)", &app.opt_service);
+    ImGui::Checkbox("OS detection (-O, needs setcap/root)", &app.opt_os);
+    ImGui::SetNextItemWidth(90.0f);
+    ImGui::InputInt("Timing (-T0..5)", &app.opt_timing);
+    app.opt_timing = std::min(std::max(app.opt_timing, 0), 5);
+
+    if (running) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("Scan", ImVec2(120.0f, 0.0f))) {
+        start_scan(app);
+    }
+    if (running) {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+    if (!running) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("Cancel")) {
+        if (app.scan_job) {
+            app.scan_job->runner.cancel();
+        }
+    }
+    if (!running) {
+        ImGui::EndDisabled();
+    }
+
+    if (running) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                                 std::chrono::steady_clock::now() - app.scan_start)
+                                 .count();
+        std::string task;
+        int percent = -1;
+        {
+            std::lock_guard<std::mutex> lock(app.scan_job->mtx);
+            task = app.scan_job->task;
+            percent = app.scan_job->percent;
+        }
+        if (percent >= 0 && !task.empty()) {
+            ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Scanning... %d%%  (%s)",
+                               percent, task.c_str());
+        } else if (!task.empty()) {
+            ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Scanning... %s",
+                               task.c_str());
+        } else {
+            ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Scanning... %llds",
+                               static_cast<long long>(elapsed));
+        }
+    } else {
+        ImGui::TextDisabled("Idle");
     }
     ImGui::End();
 }
@@ -315,11 +567,19 @@ int main(int argc, char** argv) {
     std::string xml_arg;
     bool want_demo = (argc < 2);
     int db_arg = -1;
+    bool auto_scan = false;
+    bool target_set = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--demo") {
             want_demo = true;
+        } else if (arg == "--scan" && i + 1 < argc) {
+            std::snprintf(app.target_buf, sizeof(app.target_buf), "%s", argv[++i]);
+            auto_scan = true;
+            target_set = true;
+        } else if (arg == "--no-service") {
+            app.opt_service = false;
         } else if (arg == "--id" && i + 1 < argc) {
             db_arg = std::atoi(argv[++i]);
         } else if (arg == "--db" && i + 1 < argc) {
@@ -332,6 +592,9 @@ int main(int argc, char** argv) {
     std::snprintf(app.db_path_buf, sizeof(app.db_path_buf), "%s", storage_path.c_str());
     if (!xml_arg.empty()) {
         std::snprintf(app.xml_path_buf, sizeof(app.xml_path_buf), "%s", xml_arg.c_str());
+    }
+    if (!target_set) {
+        init_default_target(app);
     }
 
     if (!glfwInit()) {
@@ -371,6 +634,10 @@ int main(int argc, char** argv) {
         load_demo(app);
     }
 
+    if (auto_scan) {
+        start_scan(app);
+    }
+
     while (!glfwWindowShouldClose(app.window)) {
         glfwPollEvents();
 
@@ -378,7 +645,10 @@ int main(int argc, char** argv) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        poll_scan(app);
+
         build_dockspace(app);
+        draw_scan_panel(app);
         draw_canvas(app);
         draw_inspector(app);
         draw_data(app);

@@ -20,8 +20,15 @@ namespace vnm {
 std::vector<std::string> NmapRunner::build_argv(const ScanOptions& options) {
     std::vector<std::string> argv;
     argv.push_back(options.nmap_path);
-    argv.push_back("-oX");
-    argv.push_back("-"); // XML to stdout
+    if (!options.xml_path.empty()) {
+        // XML to file so nmap keeps its normal (human-readable) output live
+        // on the pipe for the UI log.
+        argv.push_back("-oX");
+        argv.push_back(options.xml_path);
+    } else {
+        argv.push_back("-oX");
+        argv.push_back("-"); // XML to stdout
+    }
     argv.push_back("-T" + std::to_string(options.timing));
     if (options.service_detection) {
         argv.push_back("-sV");

@@ -6,6 +6,18 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.3.1] - 2026-10-09
+
+### Dodane
+
+- Panel GUI **Scan**: uruchamianie `nmap` na żądanie z poziomu UI (cel, `-sV`,
+  `-O`, timing) w wątku tła, z przyciskiem **Cancel** oraz verbose, czytelnym
+  logiem (natywny output nmapa: inicjalizacja skanów, wykryte otwarte porty,
+  raporty hostów) zamiast surowego XML; po zakończeniu skanu wyniki zastępują
+  mapę. XML trafia do pliku tymczasowego, a normalny output leci na żywo
+  (`-v --stats-every 5s`).
+- Argumenty GUI `--scan <target>` i `--no-service` do startu skanu przy starcie.
+
 ## [0.3.0] - 2026-10-09
 
 Natywne GUI 2D (Dear ImGui docking).
