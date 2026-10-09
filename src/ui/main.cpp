@@ -926,6 +926,11 @@ void draw_canvas(App& app) {
 
     app.view.selected = vnm::ui::draw_topology(app.scan, app.layout, app.config, app.view);
 
+    if (!app.view.last_opened_url.empty()) {
+        log_line(app, "open: " + app.view.last_opened_url);
+        app.view.last_opened_url.clear();
+    }
+
     ImGui::End();
 }
 
@@ -936,6 +941,11 @@ void draw_host_details(const vnm::Host& host) {
     ImGui::Text("Hostname:   %s", host.hostname.empty() ? "-" : host.hostname.c_str());
     ImGui::Text("Vendor:     %s", host.vendor.empty() ? "-" : host.vendor.c_str());
     ImGui::Text("MAC:        %s", host.mac.empty() ? "-" : host.mac.c_str());
+    const std::vector<vnm::RefLink> mac_refs = vnm::mac_links(host);
+    if (!mac_refs.empty()) {
+        ImGui::SameLine();
+        ImGui::TextLinkOpenURL(mac_refs[0].label.c_str(), mac_refs[0].url.c_str());
+    }
     ImGui::Text("Subnet:     %s", host.subnet.empty() ? "-" : host.subnet.c_str());
     const std::string status =
         std::string(vnm::to_string(host.status)) +

@@ -31,6 +31,9 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   porcie (SpeedGuide / IANA / Shodan), wyszukiwarka podatności usługi (Vulners /
   NVD / Exploit-DB) oraz link do każdego CVE (NVD). Chipy tekstowe otwierają się
   w przeglądarce systemowej.
+- Link do sprawdzenia vendora po MAC (maclookup.app) obok adresu MAC hosta.
+- Kliknięcie chipa na canvasie zapisuje też URL do Logu, by można go było
+  skopiować, gdy nie ma zainstalowanej przeglądarki.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
   (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
   wykrywane.

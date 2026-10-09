@@ -31,4 +31,7 @@ struct RefLink {
 /// Reference links for host-level findings (hostscript CVEs).
 [[nodiscard]] std::vector<RefLink> host_links(const Host& host);
 
+/// Vendor lookup link for the host MAC address (maclookup.app), if present.
+[[nodiscard]] std::vector<RefLink> mac_links(const Host& host);
+
 } // namespace vnm

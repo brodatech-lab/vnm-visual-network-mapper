@@ -116,7 +116,9 @@ i wypisuje zaobserwowane hosty; **Merge to map** włącza je do topologii.
 Każda karta szczegółów hosta (oraz Inspector) pokazuje klikalne **linki
 referencyjne** dla otwartych portów: info o porcie (SpeedGuide/IANA/Shodan),
 wyszukiwarka podatności usługi (Vulners/NVD/Exploit-DB) oraz link do każdego CVE
-wykrytego przez NSE (NVD).
+wykrytego przez NSE (NVD), a także sprawdzenie vendora po MAC (maclookup.app).
+Otwarcie linku wymaga przeglądarki (`xdg-open` na Linuksie); URL trafia też do
+Logu.
 
 ## Architektura
 

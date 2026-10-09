@@ -257,6 +257,7 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             for (const auto& chip : state.cards[static_cast<std::size_t>(i)].chips) {
                 if (point_in(m, chip.a, chip.b)) {
                     open_url(chip.url);
+                    state.last_opened_url = chip.url;
                     handled = true;
                     break;
                 }
@@ -514,6 +515,11 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                 card_h_w += line_h_w;
             }
         }
+        const std::vector<vnm::RefLink> mac_refs = vnm::mac_links(host);
+        if (!mac_refs.empty()) {
+            card_h_w += 3.0f +
+                        static_cast<float>(row_count(mac_refs)) * chip_block;
+        }
         const std::vector<vnm::RefLink> host_links = vnm::host_links(host);
         if (!host_links.empty()) {
             card_h_w += 6.0f + line_h_w + 3.0f +
@@ -603,6 +609,9 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             wy = y + chip_block;
         };
 
+        if (!mac_refs.empty()) {
+            draw_chips(mac_refs);
+        }
         if (!host.ports.empty()) {
             wy += 6.0f;
             draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),

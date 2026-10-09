@@ -29,6 +29,9 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - **Reference links** on detail cards (canvas) and in the Inspector: port info
   (SpeedGuide / IANA / Shodan), service vulnerability search (Vulners / NVD /
   Exploit-DB) and one link per CVE (NVD). Text chips open in the system browser.
+- MAC vendor lookup link (maclookup.app) next to the host MAC address.
+- Clicking a canvas chip also writes the URL to the Log, so it can be copied
+  when no browser is installed.
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.

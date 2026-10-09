@@ -63,5 +63,13 @@ int main() {
     CHECK(hlinks.size() == 1);
     CHECK(has_url_containing(hlinks, "CVE-2020-9999"));
 
+    // MAC vendor lookup.
+    host.mac = "AA:BB:CC:DD:EE:FF";
+    const std::vector<RefLink> macs = mac_links(host);
+    CHECK(macs.size() == 1);
+    CHECK(macs[0].url == "https://maclookup.app/search/result?mac=AA:BB:CC:DD:EE:FF");
+    Host no_mac;
+    CHECK(mac_links(no_mac).empty());
+
     return vnmtest::summary("links");
 }

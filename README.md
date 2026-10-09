@@ -114,7 +114,9 @@ Linux) and lists observed hosts; **Merge to map** folds them into the topology.
 
 Each host detail card (and the Inspector) shows clickable **reference links**
 for open ports: port info (SpeedGuide/IANA/Shodan), service vulnerability search
-(Vulners/NVD/Exploit-DB) and one link per CVE found by NSE (NVD).
+(Vulners/NVD/Exploit-DB) and one link per CVE found by NSE (NVD), plus a MAC
+vendor lookup (maclookup.app). Opening a link needs a browser (`xdg-open` on
+Linux); the URL is also written to the Log.
 
 ## Architecture
 

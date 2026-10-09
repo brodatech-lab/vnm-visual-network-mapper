@@ -43,6 +43,9 @@ struct TopologyViewState {
         std::vector<Chip> chips;      // rebuilt every frame while drawing
     };
     std::vector<Card> cards;
+
+    // Last URL opened from a chip (drained by the app so it can be logged).
+    std::string last_opened_url;
 };
 
 /// Draws the 2D topology into the current window and returns the host index

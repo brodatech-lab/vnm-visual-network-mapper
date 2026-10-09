@@ -140,4 +140,15 @@ std::vector<RefLink> host_links(const Host& host) {
     return links;
 }
 
+std::vector<RefLink> mac_links(const Host& host) {
+    std::vector<RefLink> links;
+    if (host.mac.empty()) {
+        return links;
+    }
+    links.push_back({"MAC lookup",
+                     "https://maclookup.app/search/result?mac=" + host.mac,
+                     LinkKind::Info});
+    return links;
+}
+
 } // namespace vnm
