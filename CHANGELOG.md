@@ -6,6 +6,31 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-09
+
+Passive discovery (ARP + DHCP).
+
+### Added
+
+- `vnm/passive.hpp` + `src/core/passive.cpp`: dependency-free ARP and DHCP
+  decoders (hostname option 12, vendor class option 60, requested IP option 50)
+  and a `PassiveScanner` built on libpcap (background capture thread, BPF
+  filter `arp or (udp and (port 67 or port 68))`).
+- CLI `vnm sniff [--iface <dev>] [--seconds N]` — live passive observations,
+  de-duplicated by MAC/IP.
+- GUI **Passive** panel: interface picker, Start/Stop, live table (IP/MAC/
+  hostname/vendor) and **Merge to map** that folds observations into the
+  current topology.
+- CMake option `VNM_ENABLE_PCAP` (AUTO): ON when libpcap is found,
+  automatically OFF when cross-compiling or when no pcap/Npcap is present.
+- `test_passive`: ARP/DHCP decoders exercised on synthetic frames (no root).
+
+### Notes
+
+- Linux passive capture needs `CAP_NET_RAW` (root or
+  `setcap cap_net_raw,cap_net_admin=eip ./vnm_gui`).
+- Windows build keeps passive disabled (stub) until the Npcap SDK is provided.
+
 ## [0.4.2] - 2026-10-09
 
 ### Added

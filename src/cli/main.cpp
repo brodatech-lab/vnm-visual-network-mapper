@@ -1,21 +1,28 @@
+#include <atomic>
+#include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "vnm/diff.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
+#include "vnm/passive.hpp"
 #include "vnm/scan.hpp"
 #include "vnm/storage.hpp"
 
 namespace {
 
-constexpr const char* kVersion = "0.4.2";
+constexpr const char* kVersion = "0.5.0";
 
 void print_usage() {
     std::cout <<
@@ -29,6 +36,7 @@ void print_usage() {
         "  vnm history                    List stored scans\n"
         "  vnm show <id>                  Print a stored scan\n"
         "  vnm diff <before_id> <after_id>  Compare two stored scans\n"
+        "  vnm sniff [--iface <dev>] [--seconds N]  Passive ARP/DHCP discovery\n"
         "  vnm version                    Print version\n"
         "  vnm help                       Show this help\n"
         "\n"
@@ -270,6 +278,133 @@ int cmd_diff(const std::string& before_text, const std::string& after_text) {
     return 0;
 }
 
+std::atomic<bool> g_sniff_stop{false};
+
+void on_sigint(int) { g_sniff_stop.store(true); }
+
+int cmd_sniff(int argc, char** argv, int start) {
+    std::string iface;
+    int seconds = 0;
+    for (int i = start; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--iface" && i + 1 < argc) {
+            iface = argv[++i];
+        } else if (arg == "--seconds" && i + 1 < argc) {
+            seconds = std::atoi(argv[++i]);
+        } else {
+            std::cerr << "error: unknown sniff option '" << arg << "'\n";
+            return 1;
+        }
+    }
+
+    if (!vnm::PassiveScanner::supported()) {
+        std::cerr << "error: passive discovery not available "
+                     "(built without libpcap/Npcap)\n";
+        return 1;
+    }
+
+    if (iface.empty()) {
+        const auto ifaces = vnm::NetInfo::interfaces();
+        for (const auto& face : ifaces) {
+            if (!face.loopback && face.up) {
+                iface = face.name;
+                break;
+            }
+        }
+        if (iface.empty()) {
+            for (const auto& face : ifaces) {
+                if (!face.loopback) {
+                    iface = face.name;
+                    break;
+                }
+            }
+        }
+    }
+    if (iface.empty()) {
+        std::cerr << "error: no interface to sniff (use --iface)\n";
+        return 1;
+    }
+
+    std::mutex mtx;
+    std::map<std::string, vnm::PassiveObservation> table;
+    vnm::PassiveScanner scanner;
+    std::string error;
+    const bool started = scanner.start(
+        iface,
+        [&](const vnm::PassiveObservation& obs) {
+            std::lock_guard<std::mutex> lock(mtx);
+            const std::string key = obs.mac.empty() ? obs.ip : obs.mac;
+            auto& entry = table[key];
+            if (entry.count == 0) {
+                entry = obs;
+            } else {
+                entry.count += 1;
+                entry.last_seen = obs.last_seen;
+                if (obs.has_ip && !obs.ip.empty()) {
+                    entry.ip = obs.ip;
+                    entry.has_ip = true;
+                }
+                if (!obs.hostname.empty()) {
+                    entry.hostname = obs.hostname;
+                }
+                if (!obs.vendor.empty()) {
+                    entry.vendor = obs.vendor;
+                }
+            }
+            std::cout << "  [" << obs.source << "] " << (obs.ip.empty() ? "-" : obs.ip)
+                      << "  " << (obs.mac.empty() ? "-" : obs.mac);
+            if (!obs.hostname.empty()) {
+                std::cout << "  host=" << obs.hostname;
+            }
+            if (!obs.vendor.empty()) {
+                std::cout << "  vendor=" << obs.vendor;
+            }
+            std::cout << std::endl;
+        },
+        &error);
+    if (!started) {
+        std::cerr << "error: " << error << '\n';
+        return 1;
+    }
+
+    std::signal(SIGINT, on_sigint);
+    std::cout << "Sniffing ARP/DHCP on '" << iface << "'";
+    if (seconds > 0) {
+        std::cout << " for " << seconds << "s";
+    }
+    std::cout << " (Ctrl-C to stop)\n";
+
+    const auto begin = std::chrono::steady_clock::now();
+    while (!g_sniff_stop.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        if (seconds > 0) {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                                     std::chrono::steady_clock::now() - begin)
+                                     .count();
+            if (elapsed >= seconds) {
+                break;
+            }
+        }
+    }
+    scanner.stop();
+
+    std::cout << "\nObserved " << table.size() << " host(s), " << scanner.packets()
+              << " packets\n";
+    for (const auto& item : table) {
+        const vnm::PassiveObservation& o = item.second;
+        std::cout << "  " << (o.ip.empty() ? "-" : o.ip) << "  "
+                  << (o.mac.empty() ? "-" : o.mac);
+        if (!o.hostname.empty()) {
+            std::cout << "  " << o.hostname;
+        }
+        if (!o.vendor.empty()) {
+            std::cout << "  (" << o.vendor << ")";
+        }
+        std::cout << '\n';
+    }
+    return 0;
+}
+
 int cmd_scan(int argc, char** argv, int start) {
     if (start >= argc) {
         std::cerr << "error: missing scan target\n";
@@ -353,6 +488,8 @@ int main(int argc, char** argv) {
         return cmd_show(argv[2]);
     } else if (cmd == "diff" && argc >= 4) {
         return cmd_diff(argv[2], argv[3]);
+    } else if (cmd == "sniff") {
+        return cmd_sniff(argc, argv, 2);
     } else if (cmd == "scan") {
         return cmd_scan(argc, argv, 2);
     } else {

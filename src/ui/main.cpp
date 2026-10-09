@@ -13,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -25,6 +26,7 @@
 #include "vnm/model.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
+#include "vnm/passive.hpp"
 #include "vnm/platform.hpp"
 #include "vnm/scan.hpp"
 #include "vnm/storage.hpp"
@@ -66,6 +68,12 @@ struct App {
     bool opt_os{false};
     int opt_timing{4};
     std::chrono::steady_clock::time_point scan_start;
+
+    std::unique_ptr<vnm::PassiveScanner> passive;
+    std::mutex passive_mtx;
+    std::map<std::string, vnm::PassiveObservation> passive_table;
+    std::vector<std::string> passive_ifaces;
+    int passive_iface_index{0};
 };
 
 void log_line(App& app, const std::string& message) {
@@ -314,6 +322,131 @@ void poll_scan(App& app) {
     app.scan_job.reset();
 }
 
+void start_passive(App& app) {
+    if (app.passive) {
+        return;
+    }
+    if (!vnm::PassiveScanner::supported()) {
+        log_line(app, "passive discovery not available (built without libpcap/Npcap)");
+        return;
+    }
+    if (app.passive_ifaces.empty()) {
+        log_line(app, "passive: no interface selected");
+        return;
+    }
+    const std::string device =
+        app.passive_ifaces[static_cast<std::size_t>(app.passive_iface_index)];
+    {
+        std::lock_guard<std::mutex> lock(app.passive_mtx);
+        app.passive_table.clear();
+    }
+
+    auto scanner = std::make_unique<vnm::PassiveScanner>();
+    App* self = &app;
+    std::string error;
+    const bool ok = scanner->start(
+        device,
+        [self](const vnm::PassiveObservation& obs) {
+            std::lock_guard<std::mutex> lock(self->passive_mtx);
+            const std::string key = obs.mac.empty() ? obs.ip : obs.mac;
+            auto& entry = self->passive_table[key];
+            if (entry.count == 0) {
+                entry = obs;
+            } else {
+                entry.count += 1;
+                entry.last_seen = obs.last_seen;
+                if (obs.has_ip && !obs.ip.empty()) {
+                    entry.ip = obs.ip;
+                    entry.has_ip = true;
+                }
+                if (!obs.hostname.empty()) {
+                    entry.hostname = obs.hostname;
+                }
+                if (!obs.vendor.empty()) {
+                    entry.vendor = obs.vendor;
+                }
+            }
+        },
+        &error);
+    if (!ok) {
+        log_line(app, "passive: " + error);
+        return;
+    }
+    app.passive = std::move(scanner);
+    log_line(app, "Passive discovery started on " + device);
+}
+
+void stop_passive(App& app) {
+    if (!app.passive) {
+        return;
+    }
+    app.passive->stop();
+    app.passive.reset();
+    log_line(app, "Passive discovery stopped");
+}
+
+void merge_passive(App& app) {
+    std::size_t added = 0;
+    std::size_t updated = 0;
+    {
+        std::lock_guard<std::mutex> lock(app.passive_mtx);
+        for (const auto& item : app.passive_table) {
+            const vnm::PassiveObservation& o = item.second;
+            if (o.ip.empty() && o.mac.empty()) {
+                continue;
+            }
+            const std::string address = o.ip.empty() ? o.mac : o.ip;
+
+            vnm::Host* target = nullptr;
+            for (auto& host : app.scan.hosts) {
+                const bool ip_match = !o.ip.empty() && host.address == o.ip;
+                const bool mac_match =
+                    !o.mac.empty() && !host.mac.empty() && host.mac == o.mac;
+                if (ip_match || mac_match) {
+                    target = &host;
+                    break;
+                }
+            }
+
+            if (target == nullptr) {
+                vnm::Host host;
+                host.address = address;
+                host.mac = o.mac;
+                host.hostname = o.hostname;
+                host.vendor = o.vendor;
+                host.status = vnm::HostStatus::Up;
+                host.status_reason = "passive";
+                host.subnet = o.ip.empty() ? std::string("passive")
+                                           : vnm::subnet_of(o.ip, 24);
+                if (host.subnet.empty()) {
+                    host.subnet = "passive";
+                }
+                host.risk = vnm::evaluate_risk(host);
+                app.scan.hosts.push_back(std::move(host));
+                ++added;
+            } else {
+                if (target->mac.empty() && !o.mac.empty()) {
+                    target->mac = o.mac;
+                }
+                if (target->hostname.empty() && !o.hostname.empty()) {
+                    target->hostname = o.hostname;
+                }
+                if (target->vendor.empty() && !o.vendor.empty()) {
+                    target->vendor = o.vendor;
+                }
+                if (target->status != vnm::HostStatus::Up) {
+                    target->status = vnm::HostStatus::Up;
+                    target->status_reason = "passive";
+                }
+                ++updated;
+            }
+        }
+    }
+    refresh(app);
+    log_line(app, "Passive merge: +" + std::to_string(added) + " new, " +
+                      std::to_string(updated) + " updated");
+}
+
 void build_dockspace(App& app) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->WorkPos);
@@ -339,6 +472,8 @@ void build_dockspace(App& app) {
         ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspace_id, vp->WorkSize);
         ImGuiID center = dockspace_id;
+        ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.22f,
+                                                   nullptr, &center);
         ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.34f,
                                                     nullptr, &center);
         ImGuiID right_top = 0;
@@ -346,6 +481,7 @@ void build_dockspace(App& app) {
         ImGui::DockBuilderSplitNode(right, ImGuiDir_Up, 0.50f, &right_top, &right_bottom);
         ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.26f,
                                                      nullptr, &center);
+        ImGui::DockBuilderDockWindow("Passive", left);
         ImGui::DockBuilderDockWindow("Scan", right_top);
         ImGui::DockBuilderDockWindow("Inspector", right_bottom);
         ImGui::DockBuilderDockWindow("Data", right_bottom);
@@ -436,6 +572,91 @@ void draw_scan_panel(App& app) {
         }
     } else {
         ImGui::TextDisabled("Idle");
+    }
+    ImGui::End();
+}
+
+void draw_passive_panel(App& app) {
+    ImGui::Begin("Passive");
+    const bool running = app.passive && app.passive->running();
+
+    ImGui::TextWrapped("Passive ARP/DHCP discovery. Needs CAP_NET_RAW (root or "
+                       "setcap) on Linux; Npcap on Windows.");
+
+    if (!app.passive_ifaces.empty()) {
+        if (running) {
+            ImGui::BeginDisabled();
+        }
+        const char* current =
+            app.passive_ifaces[static_cast<std::size_t>(app.passive_iface_index)].c_str();
+        if (ImGui::BeginCombo("Interface", current)) {
+            for (int i = 0; i < static_cast<int>(app.passive_ifaces.size()); ++i) {
+                const bool selected = i == app.passive_iface_index;
+                if (ImGui::Selectable(app.passive_ifaces[static_cast<std::size_t>(i)].c_str(),
+                                      selected)) {
+                    app.passive_iface_index = i;
+                }
+                if (selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (running) {
+            ImGui::EndDisabled();
+        }
+    } else {
+        ImGui::TextDisabled("no interfaces");
+    }
+
+    if (!running) {
+        if (ImGui::Button("Start")) {
+            start_passive(app);
+        }
+    } else if (ImGui::Button("Stop")) {
+        stop_passive(app);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Merge to map")) {
+        merge_passive(app);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) {
+        std::lock_guard<std::mutex> lock(app.passive_mtx);
+        app.passive_table.clear();
+    }
+
+    if (running) {
+        ImGui::TextColored(ImVec4(0.95f, 0.77f, 0.06f, 1.0f), "Listening... packets: %llu",
+                           static_cast<unsigned long long>(app.passive->packets()));
+    } else if (!vnm::PassiveScanner::supported()) {
+        ImGui::TextDisabled("not available (no libpcap/Npcap at build time)");
+    }
+
+    if (ImGui::BeginTable("passive_hosts", 4,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                              ImGuiTableFlags_ScrollY |
+                              ImGuiTableFlags_SizingStretchProp,
+                          ImVec2(0.0f, -1.0f))) {
+        ImGui::TableSetupColumn("IP");
+        ImGui::TableSetupColumn("MAC");
+        ImGui::TableSetupColumn("Hostname");
+        ImGui::TableSetupColumn("Vendor");
+        ImGui::TableHeadersRow();
+        std::lock_guard<std::mutex> lock(app.passive_mtx);
+        for (const auto& item : app.passive_table) {
+            const vnm::PassiveObservation& o = item.second;
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(o.ip.empty() ? "-" : o.ip.c_str());
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(o.mac.empty() ? "-" : o.mac.c_str());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextUnformatted(o.hostname.empty() ? "-" : o.hostname.c_str());
+            ImGui::TableSetColumnIndex(3);
+            ImGui::TextUnformatted(o.vendor.empty() ? "-" : o.vendor.c_str());
+        }
+        ImGui::EndTable();
     }
     ImGui::End();
 }
@@ -607,6 +828,17 @@ int main(int argc, char** argv) {
         init_default_target(app);
     }
 
+    for (const auto& iface : vnm::NetInfo::interfaces()) {
+        if (!iface.loopback) {
+            app.passive_ifaces.push_back(iface.name);
+        }
+    }
+    if (app.passive_ifaces.empty()) {
+        for (const auto& iface : vnm::NetInfo::interfaces()) {
+            app.passive_ifaces.push_back(iface.name);
+        }
+    }
+
     if (!glfwInit()) {
         std::fprintf(stderr, "error: failed to initialize GLFW\n");
         return 1;
@@ -659,6 +891,7 @@ int main(int argc, char** argv) {
 
         build_dockspace(app);
         draw_scan_panel(app);
+        draw_passive_panel(app);
         draw_canvas(app);
         draw_inspector(app);
         draw_data(app);
@@ -676,6 +909,9 @@ int main(int argc, char** argv) {
         glfwSwapBuffers(app.window);
     }
 
+    if (app.passive) {
+        app.passive->stop();
+    }
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

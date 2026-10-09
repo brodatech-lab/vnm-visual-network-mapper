@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(vnm
-    VERSION 0.4.2
+    VERSION 0.5.0
     DESCRIPTION "VNM - Visual Network Mapper"
     LANGUAGES C CXX)
 
@@ -21,6 +21,7 @@ option(VNM_BUILD_CLI    "Build the vnm command line bootstrap" ON)
 option(VNM_BUILD_GUI    "Build the native 2D GUI (Dear ImGui)"   OFF)
 option(VNM_BUILD_TESTS  "Build unit tests"                        ON)
 option(VNM_WERROR       "Treat warnings as errors"                OFF)
+option(VNM_ENABLE_PCAP  "Enable passive discovery (libpcap/Npcap)" ON)
 
 # ---------------------------------------------------------------------------
 # vnm_core: GUI-independent engine (model, net, scan, parse, layout, storage)
@@ -33,7 +34,8 @@ add_library(vnm_core STATIC
     src/core/layout.cpp
     src/core/diff.cpp
     src/core/storage.cpp
-    src/core/platform.cpp)
+    src/core/platform.cpp
+    src/core/passive.cpp)
 
 target_include_directories(vnm_core
     PUBLIC
@@ -79,6 +81,40 @@ if(NOT SQLite3_FOUND)
 endif()
 
 target_link_libraries(vnm_core PUBLIC SQLite::SQLite3)
+
+# ---------------------------------------------------------------------------
+# Optional passive discovery (libpcap on Linux, Npcap SDK on Windows)
+# ---------------------------------------------------------------------------
+if(VNM_ENABLE_PCAP)
+    if(CMAKE_CROSSCOMPILING)
+        message(STATUS "VNM: cross-compiling - passive discovery disabled "
+                       "(set VNM_ENABLE_PCAP=OFF to silence)")
+    else()
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(PCAP QUIET libpcap)
+        endif()
+
+        if(PCAP_FOUND)
+            message(STATUS "VNM: libpcap ${PCAP_VERSION} found - passive discovery enabled")
+            target_compile_definitions(vnm_core PUBLIC VNM_HAVE_PCAP)
+            target_include_directories(vnm_core PRIVATE ${PCAP_INCLUDE_DIRS})
+            target_link_directories(vnm_core PRIVATE ${PCAP_LIBRARY_DIRS})
+            target_link_libraries(vnm_core PRIVATE ${PCAP_LIBRARIES})
+        else()
+            find_path(PCAP_INCLUDE_DIR pcap.h)
+            find_library(PCAP_LIBRARY NAMES pcap wpcap)
+            if(PCAP_INCLUDE_DIR AND PCAP_LIBRARY)
+                message(STATUS "VNM: libpcap found - passive discovery enabled")
+                target_compile_definitions(vnm_core PUBLIC VNM_HAVE_PCAP)
+                target_include_directories(vnm_core PRIVATE ${PCAP_INCLUDE_DIR})
+                target_link_libraries(vnm_core PRIVATE ${PCAP_LIBRARY})
+            else()
+                message(STATUS "VNM: libpcap not found - passive discovery disabled")
+            endif()
+        endif()
+    endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # vnm: command line bootstrap

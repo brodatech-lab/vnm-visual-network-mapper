@@ -6,9 +6,9 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.4.0` – native core (engine + CLI), an SQLite backend with scan
-> history and diffing, a native 2D GUI (Dear ImGui docking) and **Windows +
-> Linux** support.
+> **Status:** `v0.5.0` – native core (engine + CLI), SQLite history + diffing,
+> a native 2D GUI (Dear ImGui docking), **Windows + Linux** support and
+> **passive discovery** (ARP/DHCP).
 
 ## Why
 
@@ -27,6 +27,7 @@ built on top of Nmap scan results.
   `-sS`/`-O`/ARP scans, otherwise use a connect scan (`-sT`)
 - GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
   first GUI configure, so a network connection is needed once)
+- Passive discovery (Linux): `libpcap` (auto-detected; needs `CAP_NET_RAW`)
 
 ## Quick start (Linux)
 
@@ -67,6 +68,7 @@ by the GitHub Actions release workflow on version tags.
 ./build/debug/vnm history                 # list stored scans
 ./build/debug/vnm show 1                  # print a stored scan
 ./build/debug/vnm diff 1 2                # compare two scans (time travel)
+./build/debug/vnm sniff --seconds 10      # passive ARP/DHCP discovery
 ```
 
 `scan` options: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
@@ -98,6 +100,9 @@ The **Scan** panel runs `nmap` in the background only after you press **Scan**
 human-readable log of nmap's native output — initiating scans, discovered open
 ports, per-host reports). Results replace the map when the scan finishes.
 
+The **Passive** panel listens for ARP/DHCP traffic (needs `CAP_NET_RAW` on
+Linux) and lists observed hosts; **Merge to map** folds them into the topology.
+
 ## Architecture
 
 ```
@@ -111,6 +116,7 @@ src/core/           GUI-independent core
   diff.cpp          scan comparison (added/removed/changed)
   storage.cpp       SQLite backend (scans/hosts/ports) + history
   platform.cpp      portable helpers (process id)
+  passive.cpp       passive discovery (libpcap) + ARP/DHCP decoders
 src/cli/main.cpp    CLI bootstrap
 src/ui/             native 2D GUI (GLFW + OpenGL3 + Dear ImGui docking)
   main.cpp          app, docking layout, Inspector/Data/Log panels
@@ -128,7 +134,8 @@ isolation and can be reused by both the CLI and the future GUI.
 - [x] SQLite backend (`~/.config/vnm/storage.db`) and scan diffing
 - [x] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
 - [x] Windows support (MSVC) + GitHub Actions release builds
-- [ ] Passive discovery (libpcap), SVG/PNG/PDF export
+- [x] Passive discovery (ARP/DHCP via libpcap)
+- [ ] SVG/PNG/PDF export
 
 ## License
 

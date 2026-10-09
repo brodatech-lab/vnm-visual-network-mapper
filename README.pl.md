@@ -6,9 +6,9 @@ Natywne narzędzie desktopowe dla inżynierów sieciowych, pentesterów i homela
 Płaski, czytelny podgląd 2D topologii sieci (węzły, podsieci `/24`, statusy
 bezpieczeństwa) oparty na wynikach skanowania Nmapa.
 
-> **Status:** `v0.4.0` – natywny rdzeń (silnik + CLI), backend SQLite z historią
-> i diffingiem, natywne GUI 2D (Dear ImGui docking) oraz wsparcie **Windows +
-> Linux**.
+> **Status:** `v0.5.0` – natywny rdzeń (silnik + CLI), historia + diffing na
+> SQLite, natywne GUI 2D (Dear ImGui docking), wsparcie **Windows + Linux** oraz
+> **pasywne wykrywanie** (ARP/DHCP).
 
 ## Dlaczego
 
@@ -27,6 +27,7 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
   dla `-sS`/`-O`/ARP, w przeciwnym razie użyj connect scan (`-sT`)
 - GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
   pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
+- Pasywne wykrywanie (Linux): `libpcap` (auto-detekcja; wymaga `CAP_NET_RAW`)
 
 ## Szybki start (Linux)
 
@@ -67,6 +68,7 @@ GitHub Actions przy tagach wersji.
 ./build/debug/vnm history                 # lista zapisanych skanów
 ./build/debug/vnm show 1                  # wypisz zapisany skan
 ./build/debug/vnm diff 1 2                # porównaj dwa skany (time travel)
+./build/debug/vnm sniff --seconds 10      # pasywne wykrywanie ARP/DHCP
 ```
 
 Opcje `scan`: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
@@ -99,6 +101,9 @@ Panel **Scan** uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel,
 natywnego outputu nmapa — inicjalizacja skanów, wykryte otwarte porty, raporty
 hostów). Wyniki zastępują mapę po zakończeniu skanu.
 
+Panel **Passive** nasłuchuje ruchu ARP/DHCP (wymaga `CAP_NET_RAW` na Linuksie)
+i wypisuje zaobserwowane hosty; **Merge to map** włącza je do topologii.
+
 ## Architektura
 
 ```
@@ -112,6 +117,7 @@ src/core/           rdzeń niezależny od GUI
   diff.cpp          porównywanie skanów (added/removed/changed)
   storage.cpp       backend SQLite (scans/hosts/ports) + historia
   platform.cpp      przenośne helpery (process id)
+  passive.cpp       pasywne wykrywanie (libpcap) + dekodery ARP/DHCP
 src/cli/main.cpp    bootstrap CLI
 src/ui/             natywne GUI 2D (GLFW + OpenGL3 + Dear ImGui docking)
   main.cpp          aplikacja, dokowanie, panele Inspector/Data/Log
@@ -129,7 +135,8 @@ testowalna w izolacji i może być użyta zarówno przez CLI, jak i przyszły GU
 - [x] Backend SQLite (`~/.config/vnm/storage.db`) i diffing skanów
 - [x] GUI 2D (Dear ImGui): canvas, minimapa, inspector, docking
 - [x] Wsparcie Windows (MSVC) + buildy release przez GitHub Actions
-- [ ] Pasywne wykrywanie (libpcap), eksport SVG/PNG/PDF
+- [x] Pasywne wykrywanie (ARP/DHCP przez libpcap)
+- [ ] Eksport SVG/PNG/PDF
 
 ## Licencja
 
