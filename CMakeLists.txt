@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(vnm
-    VERSION 0.6.1
+    VERSION 0.6.2
     DESCRIPTION "VNM - Visual Network Mapper"
     LANGUAGES C CXX)
 
@@ -15,6 +15,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+if(WIN32)
+    # Keep std::min/std::max (NOMINMAX) and silence MSVC getenv deprecation.
+    add_compile_definitions(NOMINMAX _CRT_SECURE_NO_WARNINGS)
 endif()
 
 option(VNM_BUILD_CLI    "Build the vnm command line bootstrap" ON)

@@ -6,6 +6,14 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.6.2] - 2026-10-09
+
+### Naprawione
+
+- Build Windows (MSVC): definiowane jest `NOMINMAX` (makra z `<windows.h>` nie
+  psują już `std::min`/`std::max`), a `<windows.h>` jest dołączane przed
+  `<shellapi.h>` w GUI.
+
 ## [0.6.1] - 2026-10-09
 
 ### Dodane

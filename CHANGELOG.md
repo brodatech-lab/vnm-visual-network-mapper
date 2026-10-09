@@ -6,6 +6,14 @@ All notable changes to the VNM project. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.6.2] - 2026-10-09
+
+### Fixed
+
+- Windows (MSVC) build: `NOMINMAX` is now defined (so `<windows.h>` macros no
+  longer break `std::min`/`std::max`) and `<windows.h>` is included before
+  `<shellapi.h>` in the GUI.
+
 ## [0.6.1] - 2026-10-09
 
 ### Added

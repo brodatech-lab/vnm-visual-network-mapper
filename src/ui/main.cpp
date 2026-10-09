@@ -1,3 +1,17 @@
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX // keep std::min/std::max working under MSVC
+#endif
+#include <windows.h>
+#include <shellapi.h>
+#else
+#include <pwd.h>
+#include <unistd.h>
+#endif
+
 #include <GLFW/glfw3.h>
 
 #include "imgui.h"
@@ -24,17 +38,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#if !defined(_WIN32)
-#include <pwd.h>
-#include <unistd.h>
-#else
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#include <shellapi.h>
-#endif
 
 #ifndef VNM_VERSION
 #define VNM_VERSION "dev"
