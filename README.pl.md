@@ -27,7 +27,9 @@ bezpieczeństwa) oparty na wynikach skanowania Nmapa.
   dla `-sS`/`-O`/ARP, w przeciwnym razie użyj connect scan (`-sT`)
 - GUI: GLFW 3.3+ oraz OpenGL (Dear ImGui pobierany przez CMake FetchContent przy
   pierwszej konfiguracji GUI – wymaga jednorazowo sieci)
-- Pasywne wykrywanie (Linux): `libpcap` (auto-detekcja; wymaga `CAP_NET_RAW`)
+- Pasywne wykrywanie (Linux): `libpcap` (auto-detekcja). Nadaj jednorazowo
+  uprawnienia przez `sudo ./scripts/setcap.sh`, by przechwytywanie działało bez
+  uruchamiania jako root.
 - Pasywne wykrywanie (Windows): zainstaluj sterownik **Npcap** (SDK Npcap jest
   pobierany automatycznie na etapie build); uruchamiaj jako Administrator
 

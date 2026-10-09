@@ -27,7 +27,8 @@ built on top of Nmap scan results.
   `-sS`/`-O`/ARP scans, otherwise use a connect scan (`-sT`)
 - GUI: GLFW 3.3+ and OpenGL (Dear ImGui is fetched via CMake FetchContent on
   first GUI configure, so a network connection is needed once)
-- Passive discovery (Linux): `libpcap` (auto-detected; needs `CAP_NET_RAW`)
+- Passive discovery (Linux): `libpcap` (auto-detected). Grant capabilities once
+  with `sudo ./scripts/setcap.sh` so capture works without running as root.
 - Passive discovery (Windows): install the **Npcap** driver at runtime (the
   Npcap SDK is fetched automatically at build time); run as Administrator
 

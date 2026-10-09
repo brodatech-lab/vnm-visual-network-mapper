@@ -34,19 +34,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
   when no browser is installed.
 - Link opening launches the configured default browser directly from its
   `.desktop` entry (`Exec=`, snap/flatpak aware), then falls back to `$BROWSER`
-  → `gio open` → `xdg-open` → known browsers. Run the GUI as your normal user
-  (not root).
+  → `gio open` → `xdg-open` → known browsers. When the GUI runs under `sudo`,
+  the browser is launched as `SUDO_USER` with the session env.
+- Passive capture without root: `scripts/setcap.sh` grants
+  `cap_net_raw,cap_net_admin` to the binaries.
 - Scan options `-sC` (default scripts) and `--script default,vuln`
   (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
 - JSON export/import now keeps NSE scripts and CVEs.
 - New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
 - **Live map building**: while a scan runs, nmap's streamed output is parsed
   line by line (host reports, discovered open ports, service table) and
-  discovered hosts/ports appear on the canvas in real time — on every platform
-  (it does not depend on nmap's XML file being readable mid-scan). The camera,
-  open cards and **frozen node positions** are preserved; existing nodes never
-  move when new ones arrive (new nodes are placed on a free spot near their
-  subnet).
+  discovered hosts/ports appear on the canvas in real time — on every platform.
+  The layout **refreshes** as new hosts arrive (nodes re-distribute radially)
+  while the camera and open cards are preserved.
 
 ## [0.6.0] - 2026-10-09
 

@@ -36,8 +36,10 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   skopiować, gdy nie ma zainstalowanej przeglądarki.
 - Otwieranie linków uruchamia skonfigurowaną domyślną przeglądarkę bezpośrednio
   z jej wpisu `.desktop` (`Exec=`, obsługa snap/flatpak), a potem fallback:
-  `$BROWSER` → `gio open` → `xdg-open` → znane przeglądarki. Uruchamiaj GUI jako
-  zwykły użytkownik (nie root).
+  `$BROWSER` → `gio open` → `xdg-open` → znane przeglądarki. Gdy GUI działa pod
+  `sudo`, przeglądarka jest uruchamiana jako `SUDO_USER` z env sesji.
+- Pasywny nasłuch bez roota: `scripts/setcap.sh` nadaje binarkom
+  `cap_net_raw,cap_net_admin`.
 - Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
   (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
   wykrywane.
@@ -46,10 +48,8 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 - **Budowa mapy na żywo**: podczas skanu strumień wyjścia nmapa jest parsowany
   linia po linii (raporty hostów, wykryte otwarte porty, tabela usług), a
   wykryte hosty/porty pojawiają się na canvasie w czasie rzeczywistym — na
-  każdej platformie (nie zależy od tego, czy plik XML nmapa da się czytać w
-  trakcie). Kamera, otwarte karty i **zamrożone pozycje nod** są zachowywane;
-  istniejące węzły nie przesuwają się, gdy dochodzą nowe (nowe lądują na wolnym
-  miejscu blisko swojej podsieci).
+  każdej platformie. Układ **odświeża się** wraz z dochodzeniem hostów (nody
+  rozkładają się radialnie), a kamera i otwarte karty są zachowywane.
 
 ## [0.6.0] - 2026-10-09
 

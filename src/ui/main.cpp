@@ -25,6 +25,11 @@
 #include <utility>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <pwd.h>
+#include <unistd.h>
+#endif
+
 #ifndef VNM_VERSION
 #define VNM_VERSION "dev"
 #endif
@@ -58,8 +63,38 @@ std::string shell_quote(const std::string& value) {
     return out;
 }
 
+bool run_command(const std::string& command, bool background);
+
+#if !defined(_WIN32)
+/// When the GUI runs under sudo, run the browser as the original user (with the
+/// session env) so it can talk to the display/bus.
+std::string session_prefix() {
+    if (::geteuid() != 0) {
+        return {};
+    }
+    const char* sudo_user = std::getenv("SUDO_USER");
+    if (sudo_user == nullptr || *sudo_user == '\0') {
+        return {};
+    }
+    std::string env;
+    if (const char* display = std::getenv("DISPLAY"); display != nullptr && *display != '\0') {
+        env += " DISPLAY=" + shell_quote(display);
+    }
+    if (passwd* pw = ::getpwnam(sudo_user)) {
+        const std::string home = pw->pw_dir != nullptr ? pw->pw_dir : "";
+        env += " XAUTHORITY=" + shell_quote(home + "/.Xauthority");
+        env += " DBUS_SESSION_BUS_ADDRESS=" +
+               shell_quote(std::string("unix:path=/run/user/") +
+                           std::to_string(pw->pw_uid) + "/bus");
+    }
+    return "runuser -u " + shell_quote(sudo_user) + " -- env" + env + " ";
+}
+#else
+std::string session_prefix() { return {}; }
+#endif
+
 bool run_command(const std::string& command, bool background) {
-    std::string full = command + " >/dev/null 2>&1";
+    std::string full = session_prefix() + command + " >/dev/null 2>&1";
     if (background) {
         full += " &";
     }
@@ -380,6 +415,9 @@ void apply_live_scan(App& app, vnm::Scan scan) {
         }
     }
     app.layout = vnm::layout_scan(app.scan, app.config);
+    // Refresh the layout: drop frozen positions so the map re-distributes
+    // (radial) as new hosts keep arriving, instead of keeping nodes pinned.
+    app.view.node_pos.clear();
 
     std::unordered_map<std::string, bool> present;
     present.reserve(app.scan.hosts.size());
