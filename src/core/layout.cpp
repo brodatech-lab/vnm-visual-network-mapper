@@ -1,11 +1,21 @@
 #include "vnm/layout.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <map>
 #include <string>
 
 namespace vnm {
+namespace {
+
+constexpr float kPi = 3.14159265358979323846f;
+
+bool ends_with_dot_one(const std::string& address) {
+    return address.size() >= 2 && address.compare(address.size() - 2, 2, ".1") == 0;
+}
+
+} // namespace
 
 std::string subnet_of(const std::string& ip, int prefix) {
     if (ip.find(':') != std::string::npos) {
@@ -38,6 +48,7 @@ std::string subnet_of(const std::string& ip, int prefix) {
 TopologyLayout layout_scan(const Scan& scan, const LayoutConfig& config) {
     TopologyLayout layout;
 
+    // Group hosts by subnet.
     std::map<std::string, std::vector<std::size_t>> groups;
     std::vector<std::string> order;
     for (std::size_t i = 0; i < scan.hosts.size(); ++i) {
@@ -59,46 +70,79 @@ TopologyLayout layout_scan(const Scan& scan, const LayoutConfig& config) {
 
     std::sort(order.begin(), order.end());
 
-    const int columns = std::max(1, config.columns_per_cluster);
+    const float node_w = config.node_width;
+    const float node_h = config.node_height;
+    const float pad = config.cluster_padding;
+    const float label_allow = config.node_height * 0.5f + 8.0f;
+
     float cursor_y = 0.0f;
     float max_width = 0.0f;
 
     for (const auto& key : order) {
-        SubnetCluster cluster;
-        cluster.cidr = key;
-        cluster.hosts = groups[key];
-
-        const int count = static_cast<int>(cluster.hosts.size());
-        const int rows = (count + columns - 1) / columns;
-        const int cols_in_row = std::min(columns, count);
-
-        cluster.width = config.cluster_padding * 2.0f +
-                        static_cast<float>(cols_in_row) * config.node_width +
-                        static_cast<float>(std::max(0, cols_in_row - 1)) *
-                            config.node_gap_x;
-        cluster.height = config.cluster_padding * 2.0f +
-                         static_cast<float>(rows) * config.node_height +
-                         static_cast<float>(std::max(0, rows - 1)) *
-                             config.node_gap_y;
-        cluster.x = 0.0f;
-        cluster.y = cursor_y;
-
-        for (int i = 0; i < count; ++i) {
-            const int row = i / columns;
-            const int col = i % columns;
-            NodePosition pos;
-            pos.host_index = cluster.hosts[static_cast<std::size_t>(i)];
-            pos.x = cluster.x + config.cluster_padding +
-                    static_cast<float>(col) *
-                        (config.node_width + config.node_gap_x);
-            pos.y = cluster.y + config.cluster_padding +
-                    static_cast<float>(row) *
-                        (config.node_height + config.node_gap_y);
-            layout.nodes.push_back(pos);
+        const std::vector<std::size_t>& hosts = groups[key];
+        if (hosts.empty()) {
+            continue;
         }
 
-        cursor_y += cluster.height + config.cluster_gap;
-        max_width = std::max(max_width, cluster.width);
+        // Pick the hub: the ".1" gateway when present, else the first host.
+        std::size_t hub = hosts.front();
+        for (const std::size_t hi : hosts) {
+            if (ends_with_dot_one(scan.hosts[hi].address)) {
+                hub = hi;
+                break;
+            }
+        }
+
+        std::vector<std::size_t> spokes;
+        for (const std::size_t hi : hosts) {
+            if (hi != hub) {
+                spokes.push_back(hi);
+            }
+        }
+        const std::size_t spoke_count = spokes.size();
+
+        // Ring radius: enough circumference so spokes do not overlap the hub.
+        float radius = 0.0f;
+        if (spoke_count > 0) {
+            const float by_circumference =
+                static_cast<float>(spoke_count) * (node_w + config.node_gap_x) /
+                (2.0f * kPi);
+            radius = std::max(node_w * 1.0f, by_circumference);
+        }
+
+        const float box_w = 2.0f * radius + node_w + 2.0f * pad;
+        const float box_h = 2.0f * radius + node_h + 2.0f * pad + label_allow;
+        const float center_x = pad + radius + node_w * 0.5f;
+        const float center_y = label_allow + pad + radius + node_h * 0.5f;
+
+        SubnetCluster cluster;
+        cluster.cidr = key;
+        cluster.hosts = hosts;
+        cluster.x = 0.0f;
+        cluster.y = cursor_y;
+        cluster.width = box_w;
+        cluster.height = box_h;
+
+        // Hub in the middle.
+        NodePosition hub_pos;
+        hub_pos.host_index = hub;
+        hub_pos.x = center_x - node_w * 0.5f;
+        hub_pos.y = cursor_y + center_y - node_h * 0.5f;
+        layout.nodes.push_back(hub_pos);
+
+        // Spokes evenly on the ring, first at the top.
+        for (std::size_t i = 0; i < spoke_count; ++i) {
+            const float angle = -kPi / 2.0f + 2.0f * kPi * static_cast<float>(i) /
+                                                  static_cast<float>(spoke_count);
+            NodePosition p;
+            p.host_index = spokes[i];
+            p.x = center_x + radius * std::cos(angle) - node_w * 0.5f;
+            p.y = cursor_y + center_y + radius * std::sin(angle) - node_h * 0.5f;
+            layout.nodes.push_back(p);
+        }
+
+        cursor_y += box_h + config.cluster_gap;
+        max_width = std::max(max_width, box_w);
         layout.clusters.push_back(std::move(cluster));
     }
 

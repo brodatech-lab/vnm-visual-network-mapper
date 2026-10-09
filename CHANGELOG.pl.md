@@ -19,6 +19,9 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   mapą przy zoomie/panie (tak samo jak bloki hostów).
 - Ramka podsieci (z CIDR skanu) jest liczona z aktualnych pozycji nod, więc
   powiększa się i przesuwa tak, by obejmować swoje (przestawiane) hosty.
+- Domyślny układ mapy jest teraz **radialny wokół bramy**: host `.1` siedzi w
+  środku ramki podsieci, a pozostałe hosty są rozłożone na okręgu wokół niego
+  (krawędzie nadal rozchodzą się od środka).
 
 ## [0.6.0] - 2026-10-09
 

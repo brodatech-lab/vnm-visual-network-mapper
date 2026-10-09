@@ -19,6 +19,9 @@ versioning follows [Semantic Versioning](https://semver.org/).
   map when zooming/panning (same as host nodes).
 - The subnet frame (with the scan CIDR) is recomputed from the current node
   positions, so it grows and moves to keep enclosing its (dragged) hosts.
+- Default map layout is now **radial** around the gateway: the `.1` host sits in
+  the centre of each subnet frame and the other hosts are placed on a ring
+  around it (edges still fan out from the centre).
 
 ## [0.6.0] - 2026-10-09
 
