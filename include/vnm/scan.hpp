@@ -18,6 +18,8 @@ struct ScanOptions {
     std::vector<std::string> extra_args;         // appended verbatim
     bool service_detection{true};                // -sV
     bool os_detection{false};                    // -O (needs privileges)
+    bool default_scripts{false};                 // -sC (default NSE scripts)
+    bool vuln_scripts{false};                    // --script default,vuln
     int timing{4};                               // -T<0..5>
 };
 

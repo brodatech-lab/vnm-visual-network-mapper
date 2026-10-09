@@ -17,6 +17,12 @@ enum class HostStatus { Up, Down, Unknown };
 ///   Unknown  -> neutral
 enum class RiskLevel { Safe, Warning, Critical, Offline, Unknown };
 
+/// An NSE script result attached to a port or host.
+struct Script {
+    std::string id;      // e.g. "vulners", "smb-vuln-ms17-010"
+    std::string output;  // raw script output
+};
+
 /// A single open/closed/filtered port together with detected service info.
 struct Port {
     std::uint16_t number{0};
@@ -26,6 +32,10 @@ struct Port {
     std::string product;    // "OpenSSH"
     std::string version;    // "8.9p1"
     std::string extrainfo;  // free-form NSE/Banner text
+    std::vector<Script> scripts;      // NSE scripts run against this port
+    std::vector<std::string> cves;    // CVE ids found in the script output
+
+    [[nodiscard]] bool has_vuln() const { return !cves.empty(); }
 
     /// Human readable "22/tcp open ssh (OpenSSH 8.9p1)".
     [[nodiscard]] std::string describe() const;
@@ -43,6 +53,8 @@ struct Host {
     std::string status_reason;      // nmap <status reason="..."> (e.g. syn-ack)
     RiskLevel risk{RiskLevel::Unknown};
     std::vector<Port> ports;
+    std::vector<Script> scripts;      // host-level (hostscript) NSE results
+    std::vector<std::string> cves;    // CVE ids found at host level
     std::string subnet;             // "192.168.1.0/24"
 
     [[nodiscard]] bool has_open_port() const;

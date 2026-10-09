@@ -30,6 +30,7 @@
 #include "topology_view.hpp"
 #include "vnm/export.hpp"
 #include "vnm/layout.hpp"
+#include "vnm/links.hpp"
 #include "vnm/model.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
@@ -81,6 +82,8 @@ struct App {
     char target_buf[128]{};
     bool opt_service{true};
     bool opt_os{false};
+    bool opt_default_scripts{false};
+    bool opt_vuln_scripts{false};
     int opt_timing{4};
     std::chrono::steady_clock::time_point scan_start;
 
@@ -314,6 +317,8 @@ void start_scan(App& app) {
     options.target = target;
     options.service_detection = app.opt_service;
     options.os_detection = app.opt_os;
+    options.default_scripts = app.opt_default_scripts;
+    options.vuln_scripts = app.opt_vuln_scripts;
     options.timing = app.opt_timing;
     options.xml_path = make_temp_xml();  // XML to file -> normal text stays live
     options.extra_args.push_back("-v");  // verbose: discovery/open-port messages
@@ -671,6 +676,8 @@ void draw_scan_panel(App& app) {
                              sizeof(app.target_buf));
     ImGui::Checkbox("Service detection (-sV)", &app.opt_service);
     ImGui::Checkbox("OS detection (-O, needs setcap/root)", &app.opt_os);
+    ImGui::Checkbox("Default scripts (-sC)", &app.opt_default_scripts);
+    ImGui::Checkbox("Vuln scripts (--script default,vuln)", &app.opt_vuln_scripts);
     ImGui::SetNextItemWidth(90.0f);
     ImGui::InputInt("Timing (-T0..5)", &app.opt_timing);
     app.opt_timing = std::min(std::max(app.opt_timing, 0), 5);
@@ -871,13 +878,14 @@ void draw_host_details(const vnm::Host& host) {
 
     ImGui::Separator();
     ImGui::Text("Open ports: %zu", static_cast<std::size_t>(host.open_port_count()));
-    if (ImGui::BeginTable("ports", 4,
+    if (ImGui::BeginTable("ports", 5,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                               ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("Port");
         ImGui::TableSetupColumn("State");
         ImGui::TableSetupColumn("Service");
         ImGui::TableSetupColumn("Version");
+        ImGui::TableSetupColumn("Links");
         ImGui::TableHeadersRow();
         for (const auto& port : host.ports) {
             ImGui::TableNextRow();
@@ -891,8 +899,34 @@ void draw_host_details(const vnm::Host& host) {
             const std::string version =
                 port.product + (port.version.empty() ? "" : " " + port.version);
             ImGui::TextUnformatted(version.c_str());
+            ImGui::TableSetColumnIndex(4);
+            if (port.state == "open") {
+                const std::vector<vnm::RefLink> links = vnm::port_links(host, port);
+                bool first = true;
+                for (const auto& link : links) {
+                    if (!first) {
+                        ImGui::SameLine();
+                    }
+                    first = false;
+                    ImGui::TextLinkOpenURL(link.label.c_str(), link.url.c_str());
+                }
+            }
         }
         ImGui::EndTable();
+    }
+
+    const std::vector<vnm::RefLink> host_refs = vnm::host_links(host);
+    if (!host_refs.empty()) {
+        ImGui::Separator();
+        ImGui::Text("Host CVEs:");
+        bool first = true;
+        for (const auto& link : host_refs) {
+            if (!first) {
+                ImGui::SameLine();
+            }
+            first = false;
+            ImGui::TextLinkOpenURL(link.label.c_str(), link.url.c_str());
+        }
     }
 }
 

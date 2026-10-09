@@ -346,12 +346,40 @@ bool import_scan_json(const std::string& text, Scan& out, std::string* error) {
                     port.service = p.str("service");
                     port.product = p.str("product");
                     port.version = p.str("version");
+                    const JVal* cves = p.find("cves");
+                    if (cves != nullptr && cves->type == JVal::Arr) {
+                        for (const JVal& cve : cves->array) {
+                            if (cve.type == JVal::Str) {
+                                port.cves.push_back(cve.text);
+                            }
+                        }
+                    }
+                    const JVal* scripts = p.find("scripts");
+                    if (scripts != nullptr && scripts->type == JVal::Arr) {
+                        for (const JVal& s : scripts->array) {
+                            if (s.type != JVal::Obj) {
+                                continue;
+                            }
+                            Script script;
+                            script.id = s.str("id");
+                            script.output = s.str("output");
+                            port.scripts.push_back(std::move(script));
+                        }
+                    }
                     host.ports.push_back(std::move(port));
                 }
             }
 
             const RiskLevel risk = risk_from(h.str("risk"));
             host.risk = risk != RiskLevel::Unknown ? risk : evaluate_risk(host);
+            const JVal* host_cves = h.find("cves");
+            if (host_cves != nullptr && host_cves->type == JVal::Arr) {
+                for (const JVal& cve : host_cves->array) {
+                    if (cve.type == JVal::Str) {
+                        host.cves.push_back(cve.text);
+                    }
+                }
+            }
             if (host.subnet.empty() && !host.address.empty()) {
                 host.subnet = subnet_of(host.address, 24);
             }

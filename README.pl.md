@@ -74,8 +74,8 @@ GitHub Actions przy tagach wersji.
 ./build/debug/vnm export scan.xml --format svg --out map.svg   # eksport mapy
 ```
 
-Opcje `scan`: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
-`--arg <value>`.
+Opcje `scan`: `--os`, `--no-service`, `--scripts` (`-sC`), `--vuln`
+(`--script default,vuln`), `--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
 
 Baza danych domyślnie: `~/.config/vnm/storage.db` (nadpisanie przez `VNM_DB`).
 
@@ -110,6 +110,11 @@ hostów). Wyniki zastępują mapę po zakończeniu skanu.
 
 Panel **Passive** nasłuchuje ruchu ARP/DHCP (wymaga `CAP_NET_RAW` na Linuksie)
 i wypisuje zaobserwowane hosty; **Merge to map** włącza je do topologii.
+
+Każda karta szczegółów hosta (oraz Inspector) pokazuje klikalne **linki
+referencyjne** dla otwartych portów: info o porcie (SpeedGuide/IANA/Shodan),
+wyszukiwarka podatności usługi (Vulners/NVD/Exploit-DB) oraz link do każdego CVE
+wykrytego przez NSE (NVD).
 
 ## Architektura
 

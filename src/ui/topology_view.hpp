@@ -23,15 +23,21 @@ struct TopologyViewState {
     int dragging_node{-1};
     bool node_drag_moved{false};
 
-    // Detail cards opened by clicking hosts (screen-space, persistent).
+    // Detail cards opened by clicking hosts (world-space, persistent).
+    struct Chip {
+        ImVec2 a{0.0f, 0.0f}; // screen rect of the clickable chip
+        ImVec2 b{0.0f, 0.0f};
+        std::string url;
+    };
     struct Card {
         int host_index{-1};
-        ImVec2 pos{0.0f, 0.0f};       // unclamped top-left
-        ImVec2 rect_a{0.0f, 0.0f};    // last drawn rect
+        ImVec2 pos{0.0f, 0.0f};       // unclamped top-left (world space)
+        ImVec2 rect_a{0.0f, 0.0f};    // last drawn rect (screen)
         ImVec2 rect_b{0.0f, 0.0f};
         ImVec2 close_a{0.0f, 0.0f};
         ImVec2 close_b{0.0f, 0.0f};
         bool dragging{false};
+        std::vector<Chip> chips;      // rebuilt every frame while drawing
     };
     std::vector<Card> cards;
 };

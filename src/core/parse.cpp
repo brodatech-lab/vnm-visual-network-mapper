@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "vnm/links.hpp"
+
 namespace vnm {
 namespace {
 
@@ -362,7 +364,40 @@ void parse_host(const XmlNode& node, Host& host) {
                     port.extrainfo = *v;
                 }
             }
+            for (const auto& script : p.children) {
+                if (script.name != "script") {
+                    continue;
+                }
+                Script s;
+                if (const std::string* id = script.attr("id")) {
+                    s.id = *id;
+                }
+                if (const std::string* output = script.attr("output")) {
+                    s.output = *output;
+                }
+                std::vector<std::string> cves = extract_cves(s.id + " " + s.output);
+                port.cves.insert(port.cves.end(), cves.begin(), cves.end());
+                port.scripts.push_back(std::move(s));
+            }
             host.ports.push_back(std::move(port));
+        }
+    }
+
+    if (const XmlNode* hostscript = node.child("hostscript")) {
+        for (const auto& script : hostscript->children) {
+            if (script.name != "script") {
+                continue;
+            }
+            Script s;
+            if (const std::string* id = script.attr("id")) {
+                s.id = *id;
+            }
+            if (const std::string* output = script.attr("output")) {
+                s.output = *output;
+            }
+            std::vector<std::string> cves = extract_cves(s.id + " " + s.output);
+            host.cves.insert(host.cves.end(), cves.begin(), cves.end());
+            host.scripts.push_back(std::move(s));
         }
     }
 

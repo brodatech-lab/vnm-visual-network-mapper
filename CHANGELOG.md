@@ -24,6 +24,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
   around it (edges still fan out from the centre).
 - Clicking a detail card brings it to the **front** (cards are hit-tested from
   the top-most one and the clicked card moves to the end of the draw order).
+- NSE parsing: `<script>` and `<hostscript>` results are read into the model
+  (`Script`, `cves`) and `CVE-YYYY-NNNN` ids are extracted on ports and hosts.
+- **Reference links** on detail cards (canvas) and in the Inspector: port info
+  (SpeedGuide / IANA / Shodan), service vulnerability search (Vulners / NVD /
+  Exploit-DB) and one link per CVE (NVD). Text chips open in the system browser.
+- Scan options `-sC` (default scripts) and `--script default,vuln`
+  (GUI checkboxes; CLI `--scripts` / `--vuln`) so vulnerabilities are detected.
+- JSON export/import now keeps NSE scripts and CVEs.
+- New `vnm/links.hpp` module and `test_links` (9/9 CTest tests).
 
 ## [0.6.0] - 2026-10-09
 

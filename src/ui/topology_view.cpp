@@ -8,8 +8,17 @@
 #include <unordered_map>
 #include <vector>
 
+#include "vnm/links.hpp"
+
 namespace vnm::ui {
 namespace {
+
+void open_url(const std::string& url) {
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    if (platform_io.Platform_OpenInShellFn != nullptr) {
+        platform_io.Platform_OpenInShellFn(ImGui::GetCurrentContext(), url.c_str());
+    }
+}
 
 ImU32 risk_u32(RiskLevel level) {
     const std::uint32_t rgb = risk_color(level);
@@ -132,31 +141,47 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
         std::any_of(state.cards.begin(), state.cards.end(),
                     [](const TopologyViewState::Card& c) { return c.dragging; });
 
-    // ---- mouse press: start dragging a card or a node ----
+    // ---- mouse press: open a link chip, drag a card, or drag a node ----
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 m = io.MousePos;
         bool handled = false;
-        // Hit-test cards from the top-most (last drawn) downwards.
-        int clicked_card = -1;
-        for (int i = static_cast<int>(state.cards.size()) - 1; i >= 0; --i) {
-            TopologyViewState::Card& card = state.cards[static_cast<std::size_t>(i)];
-            if (point_in(m, card.rect_a, card.rect_b)) {
-                if (!point_in(m, card.close_a, card.close_b)) {
-                    card.dragging = true;
+
+        // 1) clickable reference chips of the top-most cards
+        for (int i = static_cast<int>(state.cards.size()) - 1; i >= 0 && !handled; --i) {
+            for (const auto& chip : state.cards[static_cast<std::size_t>(i)].chips) {
+                if (point_in(m, chip.a, chip.b)) {
+                    open_url(chip.url);
+                    handled = true;
+                    break;
                 }
-                clicked_card = i;
-                handled = true;
-                break;
             }
         }
-        // Clicking a card brings it to the front (drawn last = on top).
-        if (clicked_card >= 0 &&
-            clicked_card != static_cast<int>(state.cards.size()) - 1) {
-            TopologyViewState::Card card = state.cards[static_cast<std::size_t>(clicked_card)];
-            state.cards.erase(state.cards.begin() +
-                              static_cast<std::ptrdiff_t>(clicked_card));
-            state.cards.push_back(card);
+
+        // 2) card body (drag / focus)
+        int clicked_card = -1;
+        if (!handled) {
+            for (int i = static_cast<int>(state.cards.size()) - 1; i >= 0; --i) {
+                TopologyViewState::Card& card = state.cards[static_cast<std::size_t>(i)];
+                if (point_in(m, card.rect_a, card.rect_b)) {
+                    if (!point_in(m, card.close_a, card.close_b)) {
+                        card.dragging = true;
+                    }
+                    clicked_card = i;
+                    handled = true;
+                    break;
+                }
+            }
+            if (clicked_card >= 0 &&
+                clicked_card != static_cast<int>(state.cards.size()) - 1) {
+                TopologyViewState::Card card =
+                    state.cards[static_cast<std::size_t>(clicked_card)];
+                state.cards.erase(state.cards.begin() +
+                                  static_cast<std::ptrdiff_t>(clicked_card));
+                state.cards.push_back(card);
+            }
         }
+
+        // 3) host node (drag)
         if (!handled) {
             const float wx = (m.x - canvas_p0.x - state.pan.x) / state.zoom;
             const float wy = (m.y - canvas_p0.y - state.pan.y) / state.zoom;
@@ -325,11 +350,14 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
     const float base = ImGui::GetFontSize();
     const float card_font = clampf(base * state.zoom, 9.0f, 20.0f);
     const float card_title = clampf((base + 3.0f) * state.zoom, 10.0f, 22.0f);
-    const float line_h_w = base + 3.0f;  // world units
+    const float line_h_w = base + 3.0f; // world units
     const float pad_w = 12.0f;
     const float title_h_w = base + 6.0f;
-    const float card_w_w = 320.0f;
+    const float card_w_w = 400.0f;
     const float close_pad = 6.0f;
+    const float chip_pad = 6.0f;
+    const float chip_gap = 4.0f;
+    const float chip_indent = 12.0f;
 
     for (auto& card : state.cards) {
         if (card.host_index < 0 ||
@@ -337,6 +365,7 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
             continue;
         }
         const Host& host = scan.hosts[static_cast<std::size_t>(card.host_index)];
+        card.chips.clear();
 
         std::vector<std::string> info;
         info.push_back("hostname: " +
@@ -348,15 +377,51 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                        (host.status_reason.empty() ? "" : " (" + host.status_reason + ")"));
         info.push_back("risk:     " + std::string(vnm::to_string(host.risk)));
 
-        const std::size_t max_ports = 10;
+        const std::size_t max_ports = 12;
         const std::size_t shown = std::min(max_ports, host.ports.size());
+        const float row_start = card.pos.x + pad_w + chip_indent;
+        const float row_right = card.pos.x + card_w_w - pad_w;
+
+        // number of wrapped chip rows for a set of links
+        auto row_count = [&](const std::vector<vnm::RefLink>& links) -> int {
+            if (links.empty()) {
+                return 0;
+            }
+            float x = row_start;
+            int rows = 1;
+            for (const auto& link : links) {
+                const float w = ImGui::CalcTextSize(link.label.c_str()).x + chip_pad * 2.0f;
+                if (x + w > row_right && x > row_start) {
+                    ++rows;
+                    x = row_start;
+                }
+                x += w + chip_gap;
+            }
+            return rows;
+        };
+        const float chip_block = line_h_w + 3.0f;
+
+        // measure card height
         float card_h_w =
             pad_w + title_h_w + 6.0f + static_cast<float>(info.size()) * line_h_w + pad_w;
         if (!host.ports.empty()) {
-            card_h_w += 6.0f + line_h_w + static_cast<float>(shown) * line_h_w;
+            card_h_w += 6.0f + line_h_w;
+            for (std::size_t i = 0; i < shown; ++i) {
+                card_h_w += line_h_w;
+                if (host.ports[i].state == "open") {
+                    card_h_w += 3.0f +
+                                static_cast<float>(row_count(vnm::port_links(host, host.ports[i]))) *
+                                    chip_block;
+                }
+            }
             if (host.ports.size() > shown) {
                 card_h_w += line_h_w;
             }
+        }
+        const std::vector<vnm::RefLink> host_links = vnm::host_links(host);
+        if (!host_links.empty()) {
+            card_h_w += 6.0f + line_h_w + 3.0f +
+                        static_cast<float>(row_count(host_links)) * chip_block;
         }
 
         const ImVec2 card_a = w2s(card.pos.x, card.pos.y);
@@ -391,6 +456,57 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                           IM_COL32(176, 184, 196, 255), text.c_str());
             wy += line_h_w;
         }
+
+        // draws clickable chips (world-space) and advances `wy`
+        auto draw_chips = [&](const std::vector<vnm::RefLink>& links) {
+            if (links.empty()) {
+                return;
+            }
+            float x = row_start;
+            float y = wy + 3.0f;
+            for (const auto& link : links) {
+                const float w = ImGui::CalcTextSize(link.label.c_str()).x + chip_pad * 2.0f;
+                if (x + w > row_right && x > row_start) {
+                    x = row_start;
+                    y += chip_block;
+                }
+                ImU32 fill = IM_COL32(38, 46, 58, 255);
+                ImU32 border = IM_COL32(70, 110, 170, 255);
+                ImU32 text_color = IM_COL32(120, 180, 255, 255);
+                if (link.kind == vnm::LinkKind::Service) {
+                    fill = IM_COL32(36, 46, 42, 255);
+                    border = IM_COL32(60, 120, 80, 255);
+                    text_color = IM_COL32(150, 210, 160, 255);
+                } else if (link.kind == vnm::LinkKind::Exploit) {
+                    fill = IM_COL32(54, 44, 30, 255);
+                    border = IM_COL32(150, 100, 40, 255);
+                    text_color = IM_COL32(245, 175, 80, 255);
+                } else if (link.kind == vnm::LinkKind::Cve) {
+                    fill = IM_COL32(60, 32, 34, 255);
+                    border = IM_COL32(175, 70, 70, 255);
+                    text_color = IM_COL32(250, 120, 110, 255);
+                }
+                const ImVec2 ca = w2s(x, y);
+                const ImVec2 cb = w2s(x + w, y + line_h_w);
+                const bool hovered_chip = point_in(io.MousePos, ca, cb);
+                draw->AddRectFilled(ca, cb, hovered_chip ? IM_COL32(72, 82, 98, 255) : fill,
+                                    4.0f);
+                draw->AddRect(ca, cb, border, 4.0f, 0, 1.0f);
+                draw->AddText(font, card_font, w2s(x + chip_pad, y + 1.0f), text_color,
+                              link.label.c_str());
+                if (hovered_chip) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                }
+                TopologyViewState::Chip chip;
+                chip.a = ca;
+                chip.b = cb;
+                chip.url = link.url;
+                card.chips.push_back(chip);
+                x += w + chip_gap;
+            }
+            wy = y + chip_block;
+        };
+
         if (!host.ports.empty()) {
             wy += 6.0f;
             draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
@@ -403,13 +519,24 @@ int draw_topology(const Scan& scan, const TopologyLayout& layout,
                 draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy), col,
                               port.describe().c_str());
                 wy += line_h_w;
+                if (port.state == "open") {
+                    draw_chips(vnm::port_links(host, port));
+                }
             }
             if (host.ports.size() > shown) {
                 const std::string more =
                     "+" + std::to_string(host.ports.size() - shown) + " more";
                 draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
                               IM_COL32(130, 138, 150, 255), more.c_str());
+                wy += line_h_w;
             }
+        }
+        if (!host_links.empty()) {
+            wy += 6.0f;
+            draw->AddText(font, card_font, w2s(card.pos.x + pad_w, wy),
+                          IM_COL32(200, 120, 120, 255), "host vulns:");
+            wy += line_h_w;
+            draw_chips(host_links);
         }
 
         card.rect_a = card_a;

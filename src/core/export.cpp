@@ -236,7 +236,30 @@ void json_write(std::ostream& out, const Scan& scan, const Geometry& geo) {
                 << json_escape(port.state) << "\", \"service\": \""
                 << json_escape(port.service) << "\", \"product\": \""
                 << json_escape(port.product) << "\", \"version\": \""
-                << json_escape(port.version) << "\"}";
+                << json_escape(port.version) << "\", \"cves\": [";
+            for (std::size_t c = 0; c < port.cves.size(); ++c) {
+                if (c != 0) {
+                    out << ", ";
+                }
+                out << "\"" << json_escape(port.cves[c]) << "\"";
+            }
+            out << "], \"scripts\": [";
+            for (std::size_t s = 0; s < port.scripts.size(); ++s) {
+                if (s != 0) {
+                    out << ", ";
+                }
+                out << "{\"id\": \"" << json_escape(port.scripts[s].id)
+                    << "\", \"output\": \"" << json_escape(port.scripts[s].output) << "\"}";
+            }
+            out << "]}";
+        }
+        out << "],\n";
+        out << "      \"cves\": [";
+        for (std::size_t c = 0; c < host.cves.size(); ++c) {
+            if (c != 0) {
+                out << ", ";
+            }
+            out << "\"" << json_escape(host.cves[c]) << "\"";
         }
         out << "]\n";
         out << "    }" << (i + 1 < scan.hosts.size() ? "," : "") << "\n";

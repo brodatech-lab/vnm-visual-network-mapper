@@ -37,6 +37,12 @@ std::vector<std::string> NmapRunner::build_argv(const ScanOptions& options) {
     if (options.os_detection) {
         argv.push_back("-O");
     }
+    if (options.vuln_scripts) {
+        argv.push_back("--script");
+        argv.push_back("default,vuln");
+    } else if (options.default_scripts) {
+        argv.push_back("-sC");
+    }
     for (const auto& extra : options.extra_args) {
         argv.push_back(extra);
     }

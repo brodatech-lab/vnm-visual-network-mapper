@@ -74,8 +74,8 @@ by the GitHub Actions release workflow on version tags.
 ./build/debug/vnm export scan.xml --format svg --out map.svg   # export the map
 ```
 
-`scan` options: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
-`--arg <value>`.
+`scan` options: `--os`, `--no-service`, `--scripts` (`-sC`), `--vuln`
+(`--script default,vuln`), `--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
 
 Default database: `~/.config/vnm/storage.db` (override with `VNM_DB`).
 
@@ -109,6 +109,10 @@ ports, per-host reports). Results replace the map when the scan finishes.
 
 The **Passive** panel listens for ARP/DHCP traffic (needs `CAP_NET_RAW` on
 Linux) and lists observed hosts; **Merge to map** folds them into the topology.
+
+Each host detail card (and the Inspector) shows clickable **reference links**
+for open ports: port info (SpeedGuide/IANA/Shodan), service vulnerability search
+(Vulners/NVD/Exploit-DB) and one link per CVE found by NSE (NVD).
 
 ## Architecture
 

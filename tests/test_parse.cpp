@@ -24,6 +24,7 @@ const char* kSample = R"XML(<?xml version="1.0" encoding="UTF-8"?>
       <port protocol="tcp" portid="22">
         <state state="open"/>
         <service name="ssh" product="OpenSSH" version="8.9p1"/>
+        <script id="vulners" output="[CVE-2021-41617] OpenSSH 8.9p1 / 8.9p1"/>
       </port>
       <port protocol="tcp" portid="23">
         <state state="open"/>
@@ -34,6 +35,9 @@ const char* kSample = R"XML(<?xml version="1.0" encoding="UTF-8"?>
         <service name="http"/>
       </port>
     </ports>
+    <hostscript>
+      <script id="vuln" output="VULNERABLE: CVE-2020-1234"/>
+    </hostscript>
   </host>
   <host>
     <status state="down"/>
@@ -72,6 +76,14 @@ int main() {
     CHECK(router.ports[0].version == "8.9p1");
     CHECK(router.ports[2].state == "closed");
     CHECK(router.risk == RiskLevel::Critical); // telnet exposed
+
+    // NSE scripts and CVE extraction (port + host level).
+    CHECK(router.ports[0].cves.size() == 1);
+    CHECK(router.ports[0].cves[0] == "CVE-2021-41617");
+    CHECK(router.ports[0].scripts.size() == 1);
+    CHECK(router.ports[0].scripts[0].id == "vulners");
+    CHECK(router.cves.size() == 1);
+    CHECK(router.cves[0] == "CVE-2020-1234");
 
     const Host& offline = scan.hosts[1];
     CHECK(offline.status == HostStatus::Down);

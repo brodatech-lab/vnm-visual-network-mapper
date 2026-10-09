@@ -24,6 +24,18 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
   (krawędzie nadal rozchodzą się od środka).
 - Kliknięcie karty szczegółów wysuwa ją na **wierzch** (karty testowane od
   wierzchu, kliknięta karta trafia na koniec kolejności rysowania).
+- Parsowanie NSE: wyniki `<script>` i `<hostscript>` trafiają do modelu
+  (`Script`, `cves`), a identyfikatory `CVE-YYYY-NNNN` są wyciągane dla portów
+  i hostów.
+- **Linki referencyjne** na kartach szczegółów (canvas) i w Inspectorze: info o
+  porcie (SpeedGuide / IANA / Shodan), wyszukiwarka podatności usługi (Vulners /
+  NVD / Exploit-DB) oraz link do każdego CVE (NVD). Chipy tekstowe otwierają się
+  w przeglądarce systemowej.
+- Opcje skanowania `-sC` (domyślne skrypty) i `--script default,vuln`
+  (checkboxy w GUI; CLI `--scripts` / `--vuln`), dzięki czemu podatności są
+  wykrywane.
+- Eksport/import JSON zachowuje teraz skrypty NSE i CVEs.
+- Nowy moduł `vnm/links.hpp` i `test_links` (9/9 testów CTest).
 
 ## [0.6.0] - 2026-10-09
 
