@@ -122,7 +122,8 @@ GitHub Actions przy tagach wersji.
 ```
 
 Opcje `scan`: `--os`, `--no-service`, `--scripts` (`-sC`), `--vuln`
-(`--script default,vuln`), `--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
+(`--script default,vuln`), `--script-timeout <sec>` (domyślnie 60),
+`--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
 
 Baza danych domyślnie: `~/.config/vnm/storage.db` (nadpisanie przez `VNM_DB`).
 
@@ -146,8 +147,8 @@ cmake --build build/debug -j
   szczegółów** (też przeciągalną, wiele naraz, zamknięcie przez **×**).
 - **Inspector** – szczegóły hosta i tabela portów z linkami.
 - **Scan** – uruchamia `nmap` w tle dopiero po kliknięciu **Scan** (cel, `-sV`,
-  `-O`, `-sC`, `--script vuln`, timing; **Cancel** + verbose log). Mapa
-  **buduje się na żywo** podczas skanu.
+  `-O`, `-sC`, `--script vuln`, timeout skryptów, timing; **Cancel** + verbose
+  log). Mapa **buduje się na żywo** podczas skanu.
 - **Data** – wczytywanie z XML / JSON / bazy; eksport do **SVG / PNG / JSON**;
   ustawienie komendy przeglądarki.
 - **Passive** – wykrywanie ARP/DHCP (wymaga uprawnień); **Merge to map**.

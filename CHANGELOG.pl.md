@@ -21,6 +21,10 @@ wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 ### Naprawione
 
+- Skan mógł wisieć w nieskończoność na Linuksie przy włączonym NSE (skrypty
+  `default`/`vuln`, np. `broadcast-*`, czekające bez odpowiedzi). Nmap dostaje
+  teraz `--script-timeout` (domyślnie 60 s; pole w GUI + CLI
+  `--script-timeout`), więc pojedynczy skrypt nie zablokuje całego skanu.
 - Tekst na canvasie nie wychodzi już poza ramki nodów/kart: zawartość jest
   przycinana do prostokąta, a długie linie skracane z `..` (było to mocno
   widoczne przy oddalaniu).

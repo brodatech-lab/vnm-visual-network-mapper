@@ -43,6 +43,12 @@ std::vector<std::string> NmapRunner::build_argv(const ScanOptions& options) {
     } else if (options.default_scripts) {
         argv.push_back("-sC");
     }
+    if ((options.default_scripts || options.vuln_scripts) &&
+        options.script_timeout_seconds > 0) {
+        // Without this, some NSE scripts (broadcast-*, vuln-*) can wait forever.
+        argv.push_back("--script-timeout");
+        argv.push_back(std::to_string(options.script_timeout_seconds) + "s");
+    }
     for (const auto& extra : options.extra_args) {
         argv.push_back(extra);
     }

@@ -47,6 +47,7 @@ void print_usage() {
         "  --no-service         Disable service detection (-sV)\n"
         "  --scripts            Enable default NSE scripts (-sC)\n"
         "  --vuln               Enable vulnerability scripts (--script default,vuln)\n"
+        "  --script-timeout N    Max seconds per NSE script (default 60, 0=off)\n"
         "  --no-save            Do not store the scan in the database\n"
         "  --nmap <path>        Use a specific nmap binary\n"
         "  -T<n>                Timing template (0..5)\n"
@@ -526,6 +527,8 @@ int cmd_scan(int argc, char** argv, int start) {
             options.default_scripts = true;
         } else if (arg == "--vuln") {
             options.vuln_scripts = true;
+        } else if (arg == "--script-timeout" && i + 1 < argc) {
+            options.script_timeout_seconds = std::atoi(argv[++i]);
         } else if (arg == "--no-save") {
             save = false;
         } else if (arg == "--nmap" && i + 1 < argc) {

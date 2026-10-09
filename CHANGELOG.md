@@ -21,6 +21,10 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Scan could hang forever on Linux when NSE is enabled (`default`/`vuln`
+  scripts such as `broadcast-*` waiting with no reply). Nmap is now given
+  `--script-timeout` (default 60 s, GUI field + CLI `--script-timeout`) so a
+  single script cannot stall the whole scan.
 - Canvas text no longer overflows node/card frames: node and detail-card content
   is clipped to its rectangle and long lines are truncated with `..` (was very
   visible when zooming out).

@@ -123,7 +123,8 @@ by the GitHub Actions release workflow on version tags.
 ```
 
 `scan` options: `--os`, `--no-service`, `--scripts` (`-sC`), `--vuln`
-(`--script default,vuln`), `--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
+(`--script default,vuln`), `--script-timeout <sec>` (default 60),
+`--no-save`, `--nmap <path>`, `-T<n>`, `--arg <value>`.
 
 Default database: `~/.config/vnm/storage.db` (override with `VNM_DB`).
 
@@ -147,8 +148,8 @@ cmake --build build/debug -j
   **detail card** (also draggable, multiple at once, closed with **×**).
 - **Inspector** – host details and a ports table with reference links.
 - **Scan** – runs `nmap` in the background only after you press **Scan**
-  (target, `-sV`, `-O`, `-sC`, `--script vuln`, timing; **Cancel** + verbose
-  log). The map is **built live** while scanning.
+  (target, `-sV`, `-O`, `-sC`, `--script vuln`, script timeout, timing;
+  **Cancel** + verbose log). The map is **built live** while scanning.
 - **Data** – load from Nmap XML / JSON / the database; export to
   **SVG / PNG / JSON**; set the browser command.
 - **Passive** – ARP/DHCP discovery (needs capabilities); **Merge to map**.

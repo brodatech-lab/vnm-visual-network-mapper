@@ -436,6 +436,7 @@ struct App {
     bool opt_os{false};
     bool opt_default_scripts{false};
     bool opt_vuln_scripts{false};
+    int opt_script_timeout{60};
     int opt_timing{4};
     std::chrono::steady_clock::time_point scan_start;
 
@@ -717,6 +718,7 @@ void start_scan(App& app) {
     options.os_detection = app.opt_os;
     options.default_scripts = app.opt_default_scripts;
     options.vuln_scripts = app.opt_vuln_scripts;
+    options.script_timeout_seconds = app.opt_script_timeout;
     options.timing = app.opt_timing;
     options.xml_path = make_temp_xml();  // XML to file -> normal text stays live
     options.extra_args.push_back("-v");  // verbose: discovery/open-port messages
@@ -1091,6 +1093,9 @@ void draw_scan_panel(App& app) {
     ImGui::Checkbox("OS detection (-O, needs setcap/root)", &app.opt_os);
     ImGui::Checkbox("Default scripts (-sC)", &app.opt_default_scripts);
     ImGui::Checkbox("Vuln scripts (--script default,vuln)", &app.opt_vuln_scripts);
+    ImGui::SetNextItemWidth(90.0f);
+    ImGui::InputInt("Script timeout (s)", &app.opt_script_timeout);
+    app.opt_script_timeout = std::max(app.opt_script_timeout, 0);
     ImGui::SetNextItemWidth(90.0f);
     ImGui::InputInt("Timing (-T0..5)", &app.opt_timing);
     app.opt_timing = std::min(std::max(app.opt_timing, 0), 5);
