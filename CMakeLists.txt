@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(vnm
-    VERSION 0.5.2
+    VERSION 0.6.0
     DESCRIPTION "VNM - Visual Network Mapper"
     LANGUAGES C CXX)
 
@@ -36,7 +36,20 @@ add_library(vnm_core STATIC
     src/core/diff.cpp
     src/core/storage.cpp
     src/core/platform.cpp
-    src/core/passive.cpp)
+    src/core/passive.cpp
+    src/core/export.cpp
+    src/core/json.cpp
+    src/core/stb_impl.cpp)
+
+target_include_directories(vnm_core PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb)
+
+# Third-party stb headers are not warning-clean; silence them for that TU only.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(src/core/stb_impl.cpp PROPERTIES COMPILE_OPTIONS "-w")
+elseif(MSVC)
+    set_source_files_properties(src/core/stb_impl.cpp PROPERTIES COMPILE_OPTIONS "/w")
+endif()
 
 target_include_directories(vnm_core
     PUBLIC

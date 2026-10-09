@@ -6,6 +6,41 @@ Wszystkie istotne zmiany w projekcie VNM. Format oparty o
 [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/),
 wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+## [0.6.0] - 2026-10-09
+
+Eksport topologii (SVG / PNG / JSON).
+
+### Dodane
+
+- `vnm/export.hpp` + `src/core/export.cpp`: `export_scan()` renderuje bieżący
+  układ topologii do **SVG** (wektor), **PNG** (raster) lub **JSON** (pełne dane
+  skanu). PNG korzysta z dołączonych `stb_image_write` + `stb_easy_font`;
+  SVG/JSON są bezzależnościowe.
+- CLI `vnm export <file.xml> [--format svg|png|json] [--out <path>]` (także
+  `--id N [--db <path>]` dla skanu z bazy).
+- `import_scan_json()` oraz **File → Load JSON…** w GUI i loader w panelu Data,
+  dzięki czemu wyeksportowaną mapę można wczytać z powrotem na canvas
+  (`vnm_gui map.json` też działa). **Browse…** otwiera wbudowaną przeglądarkę
+  plików (lista katalogów, bez narzędzi/procesów zewnętrznych).
+- Okno **About**: nazwa programu, aktualna wersja, autor `brodatech` oraz
+  klikalne linki (`brodatech.pl`, `github.com/brodatech-lab`).
+- Ikona aplikacji (lupka nad siecią): ikona okna na Linux/Windows oraz zasób
+  ikony Windows `.exe` (`assets/vnm.ico`); `assets/vnm.png` i
+  `packaging/vnm.desktop` do integracji z pulpitem Linuksa.
+- GUI panel **Data**: ścieżka bazowa eksportu + przyciski **SVG / PNG / JSON**.
+- `test_export` (treść SVG/JSON, sygnatura PNG, round-trip JSON); 8/8 testów CTest.
+- Dołączone biblioteki nagłówkowe `third_party/stb`.
+
+### Zmienione
+
+- Usunięto wbudowany skan demo; aplikacja startuje z pustym canvasem.
+- Usunięto menu **View** (dopasowanie widoku jest na pasku canvasu).
+
+### Uwagi
+
+- SVG/PNG pokazują mapę (tylko odpowiadające hosty); JSON zawiera pełny skan
+  (wszystkie hosty i porty).
+
 ## [0.5.2] - 2026-10-09
 
 ### Dodane

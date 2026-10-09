@@ -52,6 +52,14 @@ add_executable(vnm_gui
 
 target_link_libraries(vnm_gui PRIVATE vnm_core vnm_imgui ${VNM_GLFW} OpenGL::GL)
 target_include_directories(vnm_gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(vnm_gui PRIVATE VNM_VERSION="${PROJECT_VERSION}")
+
+if(WIN32)
+    set(VNM_ICON_ICO "${CMAKE_SOURCE_DIR}/assets/vnm.ico")
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/vnm.rc.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/vnm.rc @ONLY)
+    target_sources(vnm_gui PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/vnm.rc)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(vnm_gui PRIVATE -Wall -Wextra -Wpedantic)

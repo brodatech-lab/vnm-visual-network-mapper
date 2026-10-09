@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "vnm/diff.hpp"
+#include "vnm/export.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/net.hpp"
 #include "vnm/parse.hpp"
@@ -22,7 +23,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "0.5.2";
+constexpr const char* kVersion = "0.6.0";
 
 void print_usage() {
     std::cout <<
@@ -37,6 +38,7 @@ void print_usage() {
         "  vnm show <id>                  Print a stored scan\n"
         "  vnm diff <before_id> <after_id>  Compare two stored scans\n"
         "  vnm sniff [--iface <dev>] [--seconds N]  Passive ARP/DHCP discovery\n"
+        "  vnm export <file.xml> [--format svg|png|json] [--out <path>]\n"
         "  vnm version                    Print version\n"
         "  vnm help                       Show this help\n"
         "\n"
@@ -413,6 +415,96 @@ int cmd_sniff(int argc, char** argv, int start) {
     return 0;
 }
 
+std::string basename_no_ext(const std::string& path) {
+    const std::size_t slash = path.find_last_of("/\\");
+    std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    const std::size_t dot = name.find_last_of('.');
+    if (dot != std::string::npos && dot != 0) {
+        name = name.substr(0, dot);
+    }
+    return name;
+}
+
+int cmd_export(int argc, char** argv, int start) {
+    std::string input;
+    std::string format = "svg";
+    std::string out;
+    std::string db = vnm::Storage::default_path();
+    std::int64_t id = -1;
+
+    for (int i = start; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--format" && i + 1 < argc) {
+            format = argv[++i];
+        } else if (arg == "--out" && i + 1 < argc) {
+            out = argv[++i];
+        } else if (arg == "--db" && i + 1 < argc) {
+            db = argv[++i];
+        } else if (arg == "--id" && i + 1 < argc) {
+            id = parse_id(argv[++i]);
+        } else if (input.empty()) {
+            input = arg;
+        } else {
+            std::cerr << "error: unexpected argument '" << arg << "'\n";
+            return 1;
+        }
+    }
+
+    bool ok = false;
+    const vnm::ExportFormat fmt = vnm::parse_format(format, &ok);
+    if (!ok) {
+        std::cerr << "error: unknown format '" << format
+                  << "' (use svg|png|json)\n";
+        return 1;
+    }
+
+    vnm::Scan scan;
+    std::string base;
+    if (id > 0) {
+        vnm::Storage storage(db);
+        std::string error;
+        if (!storage.open(&error)) {
+            std::cerr << "error: " << error << '\n';
+            return 1;
+        }
+        const auto loaded = storage.load_scan(id, &error);
+        if (!loaded.has_value()) {
+            std::cerr << "error: " << error << '\n';
+            return 1;
+        }
+        scan = *loaded;
+        base = "vnm_scan_" + std::to_string(id);
+    } else if (!input.empty()) {
+        bool read = false;
+        const std::string xml = slurp(input, read);
+        if (!read) {
+            std::cerr << "error: cannot read " << input << '\n';
+            return 1;
+        }
+        scan = vnm::NmapXmlParser::parse(xml);
+        if (scan.hosts.empty() && scan.nmap_version.empty()) {
+            std::cerr << "error: no parseable Nmap XML in " << input << '\n';
+            return 1;
+        }
+        base = basename_no_ext(input);
+    } else {
+        std::cerr << "error: provide <file.xml> or --id <n>\n";
+        return 1;
+    }
+
+    if (out.empty()) {
+        out = base + "." + vnm::to_string(fmt);
+    }
+    const vnm::TopologyLayout layout = vnm::layout_scan(scan);
+    std::string error;
+    if (!vnm::export_scan(scan, layout, fmt, out, &error)) {
+        std::cerr << "error: " << error << '\n';
+        return 1;
+    }
+    std::cout << "Exported " << scan.host_count() << " host(s) to " << out << '\n';
+    return 0;
+}
+
 int cmd_scan(int argc, char** argv, int start) {
     if (start >= argc) {
         std::cerr << "error: missing scan target\n";
@@ -498,6 +590,8 @@ int main(int argc, char** argv) {
         return cmd_diff(argv[2], argv[3]);
     } else if (cmd == "sniff") {
         return cmd_sniff(argc, argv, 2);
+    } else if (cmd == "export") {
+        return cmd_export(argc, argv, 2);
     } else if (cmd == "scan") {
         return cmd_scan(argc, argv, 2);
     } else {

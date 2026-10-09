@@ -6,9 +6,9 @@ Native desktop tool for network engineers, pentesters and homelabs. A flat,
 readable 2D view of network topology (nodes, `/24` subnets, security status)
 built on top of Nmap scan results.
 
-> **Status:** `v0.5.2` – native core (engine + CLI), SQLite history + diffing,
-> a native 2D GUI (Dear ImGui docking), **Windows + Linux** support and
-> **passive discovery** (ARP/DHCP) on both platforms.
+> **Status:** `v0.6.0` – native core (engine + CLI), SQLite history + diffing,
+> a native 2D GUI (Dear ImGui docking), **Windows + Linux** support, **passive
+> discovery** (ARP/DHCP) and **SVG/PNG/JSON export**.
 
 ## Why
 
@@ -71,6 +71,7 @@ by the GitHub Actions release workflow on version tags.
 ./build/debug/vnm show 1                  # print a stored scan
 ./build/debug/vnm diff 1 2                # compare two scans (time travel)
 ./build/debug/vnm sniff --seconds 10      # passive ARP/DHCP discovery
+./build/debug/vnm export scan.xml --format svg --out map.svg   # export the map
 ```
 
 `scan` options: `--os`, `--no-service`, `--no-save`, `--nmap <path>`, `-T<n>`,
@@ -85,11 +86,15 @@ Build with `-DVNM_BUILD_GUI=ON` and launch `vnm_gui`:
 ```sh
 cmake -S . -B build/debug -DVNM_BUILD_GUI=ON
 cmake --build build/debug -j
-./build/debug/src/ui/vnm_gui --demo          # built-in sample topology
+./build/debug/src/ui/vnm_gui                 # empty canvas
 ./build/debug/src/ui/vnm_gui scan.xml        # load an Nmap XML file
+./build/debug/src/ui/vnm_gui map.json        # load an exported JSON map
 ./build/debug/src/ui/vnm_gui --id 1          # load scan #1 from the database
 ./build/debug/src/ui/vnm_gui --scan 192.168.0.1/24   # start a scan immediately
 ```
+
+Use **File → Load JSON…** (with a native file browser) to bring a previously
+exported map back onto the canvas. **About** shows the version and links.
 
 Features: docked panels (Canvas / Inspector / Scan / Data / Log), pan & zoom, fit
 to view, subnet frames, risk colouring, minimap with viewport, click-to-inspect
@@ -119,11 +124,13 @@ src/core/           GUI-independent core
   storage.cpp       SQLite backend (scans/hosts/ports) + history
   platform.cpp      portable helpers (process id)
   passive.cpp       passive discovery (libpcap) + ARP/DHCP decoders
+  export.cpp        SVG / PNG / JSON export
 src/cli/main.cpp    CLI bootstrap
 src/ui/             native 2D GUI (GLFW + OpenGL3 + Dear ImGui docking)
   main.cpp          app, docking layout, Inspector/Data/Log panels
   topology_view.cpp 2D canvas (pan/zoom, selection, minimap)
 tests/              unit tests (CTest)
+third_party/stb/    bundled stb_image_write + stb_easy_font
 ```
 
 `vnm_core` (static library) has no GUI dependencies, so it is testable in
@@ -137,7 +144,8 @@ isolation and can be reused by both the CLI and the future GUI.
 - [x] 2D GUI (Dear ImGui): canvas, minimap, inspector, docking
 - [x] Windows support (MSVC) + GitHub Actions release builds
 - [x] Passive discovery (ARP/DHCP via libpcap)
-- [ ] SVG/PNG/PDF export
+- [x] SVG/PNG/JSON export
+- [ ] PDF export
 
 ## License
 

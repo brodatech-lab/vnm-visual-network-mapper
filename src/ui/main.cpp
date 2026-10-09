@@ -19,9 +19,16 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
+#ifndef VNM_VERSION
+#define VNM_VERSION "dev"
+#endif
+
+#include "icon.hpp"
 #include "topology_view.hpp"
+#include "vnm/export.hpp"
 #include "vnm/layout.hpp"
 #include "vnm/model.hpp"
 #include "vnm/net.hpp"
@@ -60,6 +67,14 @@ struct App {
     char search_buf[128]{};
     char xml_path_buf[512]{};
     char db_path_buf[512]{};
+    char export_buf[512] = "vnm_export";
+    char json_path_buf[512] = "vnm_export.json";
+    bool open_load_json{false};
+    bool show_about{false};
+    bool show_browser{false};
+    std::filesystem::path browser_dir;
+    std::vector<std::pair<std::string, bool>> browser_entries;
+    std::string browser_error;
     int db_id{1};
 
     std::unique_ptr<ScanJob> scan_job;
@@ -94,48 +109,139 @@ void refresh(App& app) {
                       std::to_string(app.layout.clusters.size()) + " subnet(s)");
 }
 
-void load_demo(App& app) {
+bool load_json(App& app, const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        log_line(app, "error: cannot read " + path);
+        return false;
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
     vnm::Scan scan;
-    scan.target = "demo 192.168.0.0/24 + 10.0.0.0/24";
-    scan.nmap_version = "demo";
-
-    auto add = [&](const char* address, const char* hostname, const char* vendor,
-                   const char* os, int confidence, vnm::HostStatus status,
-                   std::vector<vnm::Port> ports) {
-        vnm::Host host;
-        host.address = address;
-        host.hostname = hostname;
-        host.vendor = vendor;
-        host.os_name = os;
-        host.os_confidence = confidence;
-        host.status = status;
-        host.ports = std::move(ports);
-        host.subnet = vnm::subnet_of(address, 24);
-        host.risk = vnm::evaluate_risk(host);
-        scan.hosts.push_back(std::move(host));
-    };
-
-    add("192.168.0.1", "router.lan", "TP-Link", "Linux 5.x", 96, vnm::HostStatus::Up,
-        {{22, "tcp", "open", "ssh", "OpenSSH", "9.0", ""},
-         {80, "tcp", "open", "http", "nginx", "1.24", ""},
-         {443, "tcp", "open", "https", "nginx", "1.24", ""}});
-    add("192.168.0.20", "nas.lan", "Synology", "Linux", 88, vnm::HostStatus::Up,
-        {{22, "tcp", "open", "ssh", "OpenSSH", "8.9", ""},
-         {445, "tcp", "open", "microsoft-ds", "Samba", "4.15", ""}});
-    add("192.168.0.42", "old-printer.lan", "HP", "embedded", 60, vnm::HostStatus::Up,
-        {{23, "tcp", "open", "telnet", "", "", ""},
-         {80, "tcp", "open", "http", "GoAhead", "2.1", ""}});
-    add("192.168.0.50", "", "Raspberry Pi", "Linux", 80, vnm::HostStatus::Up,
-        {{22, "tcp", "open", "ssh", "Dropbear", "2022", ""}});
-    add("192.168.0.99", "", "", "", 0, vnm::HostStatus::Down, {});
-    add("10.0.0.1", "core-switch", "Cisco", "IOS", 70, vnm::HostStatus::Up,
-        {{22, "tcp", "open", "ssh", "Cisco", "1.25", ""},
-         {443, "tcp", "open", "https", "", "", ""}});
-    add("10.0.0.5", "web", "VMware", "Linux", 84, vnm::HostStatus::Up,
-        {{443, "tcp", "open", "https", "nginx", "1.24", ""}});
-
+    std::string error;
+    if (!vnm::import_scan_json(ss.str(), scan, &error)) {
+        log_line(app, "error: " + error);
+        return false;
+    }
+    if (scan.hosts.empty()) {
+        log_line(app, "error: no hosts in " + path);
+        return false;
+    }
     app.scan = std::move(scan);
     refresh(app);
+    return true;
+}
+
+// ------------------------------------------------------------ file browser
+
+void browser_refresh(App& app) {
+    app.browser_entries.clear();
+    app.browser_error.clear();
+    std::error_code ec;
+    std::filesystem::directory_iterator it(app.browser_dir, ec);
+    if (ec) {
+        app.browser_error = ec.message();
+        return;
+    }
+    for (const auto& entry : it) {
+        std::error_code entry_ec;
+        const bool is_dir = entry.is_directory(entry_ec);
+        const std::string name = entry.path().filename().string();
+        if (is_dir) {
+            app.browser_entries.emplace_back(name, true);
+        } else if (entry.path().extension() == ".json") {
+            app.browser_entries.emplace_back(name, false);
+        }
+    }
+    std::sort(app.browser_entries.begin(), app.browser_entries.end(),
+              [](const auto& a, const auto& b) {
+                  if (a.second != b.second) {
+                      return a.second > b.second; // directories first
+                  }
+                  return a.first < b.first;
+              });
+}
+
+void open_browser(App& app, const std::string& initial) {
+    std::error_code ec;
+    const std::filesystem::path path(initial);
+    const std::filesystem::path parent = path.has_parent_path() ? path.parent_path()
+                                                                : std::filesystem::path();
+    if (!parent.empty() && std::filesystem::is_directory(parent, ec)) {
+        app.browser_dir = parent;
+    } else {
+        app.browser_dir = std::filesystem::current_path(ec);
+        if (ec) {
+            app.browser_dir = ".";
+        }
+    }
+    browser_refresh(app);
+    app.show_browser = true;
+}
+
+void draw_browser(App& app) {
+    if (!app.show_browser) {
+        return;
+    }
+    if (!ImGui::IsPopupOpen("Browse JSON")) {
+        ImGui::OpenPopup("Browse JSON");
+    }
+    if (!ImGui::BeginPopupModal("Browse JSON", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
+    }
+
+    bool close = false;
+    ImGui::Text("Folder: %s", app.browser_dir.string().c_str());
+    if (ImGui::Button("Up")) {
+        const std::filesystem::path parent = app.browser_dir.parent_path();
+        if (!parent.empty() && parent != app.browser_dir) {
+            app.browser_dir = parent;
+            browser_refresh(app);
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh")) {
+        browser_refresh(app);
+    }
+    if (!app.browser_error.empty()) {
+        ImGui::TextColored(ImVec4(0.91f, 0.30f, 0.24f, 1.0f), "%s",
+                           app.browser_error.c_str());
+    }
+
+    ImGui::BeginChild("##browse_list", ImVec2(560.0f, 320.0f), true);
+    for (const auto& entry : app.browser_entries) {
+        const bool is_dir = entry.second;
+        const std::string label = std::string(is_dir ? "[DIR] " : "      ") + entry.first;
+        if (ImGui::Selectable(label.c_str())) {
+            if (is_dir) {
+                app.browser_dir /= entry.first;
+                browser_refresh(app);
+                break;
+            }
+            const std::string full = (app.browser_dir / entry.first).string();
+            std::snprintf(app.json_path_buf, sizeof(app.json_path_buf), "%s", full.c_str());
+            load_json(app, full);
+            close = true;
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SetNextItemWidth(460.0f);
+    ImGui::InputText("##browse_path", app.json_path_buf, sizeof(app.json_path_buf));
+    if (ImGui::Button("Load", ImVec2(110.0f, 0.0f))) {
+        load_json(app, app.json_path_buf);
+        close = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(110.0f, 0.0f))) {
+        close = true;
+    }
+
+    if (close) {
+        app.show_browser = false;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 bool load_xml(App& app, const std::string& path) {
@@ -493,22 +599,63 @@ void build_dockspace(App& app) {
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Load demo scan")) {
-                load_demo(app);
+            if (ImGui::MenuItem("Load JSON...")) {
+                app.open_load_json = true;
             }
             if (ImGui::MenuItem("Quit")) {
                 glfwSetWindowShouldClose(app.window, GLFW_TRUE);
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem("Fit to view", "F")) {
-                app.view.fit_requested = true;
-            }
-            ImGui::EndMenu();
+        if (ImGui::MenuItem("About")) {
+            app.show_about = true;
         }
         ImGui::EndMenuBar();
     }
+
+    if (app.open_load_json) {
+        ImGui::OpenPopup("Load JSON");
+        app.open_load_json = false;
+    }
+    if (ImGui::BeginPopupModal("Load JSON", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Load a previously exported JSON map:");
+        ImGui::SetNextItemWidth(460.0f);
+        ImGui::InputText("##json_path", app.json_path_buf, sizeof(app.json_path_buf));
+        if (ImGui::Button("Browse...", ImVec2(120.0f, 0.0f))) {
+            open_browser(app, app.json_path_buf);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load", ImVec2(120.0f, 0.0f))) {
+            load_json(app, app.json_path_buf);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (app.show_about) {
+        ImGui::OpenPopup("About");
+        app.show_about = false;
+    }
+    if (ImGui::BeginPopupModal("About", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("VNM - Visual Network Mapper");
+        ImGui::Text("Version: %s", VNM_VERSION);
+        ImGui::Separator();
+        ImGui::TextUnformatted("Author: brodatech");
+        ImGui::TextLinkOpenURL("brodatech.pl", "https://brodatech.pl");
+        ImGui::TextLinkOpenURL("github.com/brodatech-lab", "https://github.com/brodatech-lab");
+        ImGui::Separator();
+        if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    draw_browser(app);
     ImGui::End();
 }
 
@@ -756,8 +903,21 @@ void draw_inspector(App& app) {
     ImGui::End();
 }
 
+void do_export(App& app, const char* ext) {
+    const std::string path = std::string(app.export_buf) + "." + ext;
+    const vnm::ExportFormat format = vnm::parse_format(ext);
+    std::string error;
+    if (vnm::export_scan(app.scan, app.layout, format, path, &error)) {
+        log_line(app, "Exported " + std::to_string(app.scan.host_count()) +
+                          " host(s) to " + path);
+    } else {
+        log_line(app, "export error: " + error);
+    }
+}
+
 void draw_data(App& app) {
     ImGui::Begin("Data");
+
     ImGui::TextWrapped("Load a scan from an Nmap XML file or from the local database.");
     ImGui::Separator();
 
@@ -772,9 +932,30 @@ void draw_data(App& app) {
     if (ImGui::Button("Load from DB")) {
         load_db(app, app.db_path_buf, app.db_id);
     }
+
+    ImGui::Separator();
+    ImGui::InputText("JSON path", app.json_path_buf, sizeof(app.json_path_buf));
+    if (ImGui::Button("Browse...")) {
+        open_browser(app, app.json_path_buf);
+    }
     ImGui::SameLine();
-    if (ImGui::Button("Demo")) {
-        load_demo(app);
+    if (ImGui::Button("Load JSON")) {
+        load_json(app, app.json_path_buf);
+    }
+
+    ImGui::Separator();
+    ImGui::TextWrapped("Export the current map (base path + format extension):");
+    ImGui::InputText("Export base", app.export_buf, sizeof(app.export_buf));
+    if (ImGui::Button("SVG")) {
+        do_export(app, "svg");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("PNG")) {
+        do_export(app, "png");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("JSON")) {
+        do_export(app, "json");
     }
     ImGui::End();
 }
@@ -800,16 +981,13 @@ int main(int argc, char** argv) {
 
     std::string storage_path = vnm::Storage::default_path();
     std::string xml_arg;
-    bool want_demo = (argc < 2);
     int db_arg = -1;
     bool auto_scan = false;
     bool target_set = false;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--demo") {
-            want_demo = true;
-        } else if (arg == "--scan" && i + 1 < argc) {
+        if (arg == "--scan" && i + 1 < argc) {
             std::snprintf(app.target_buf, sizeof(app.target_buf), "%s", argv[++i]);
             auto_scan = true;
             target_set = true;
@@ -858,6 +1036,18 @@ int main(int argc, char** argv) {
     glfwMakeContextCurrent(app.window);
     glfwSwapInterval(1);
 
+    {
+        constexpr int icon_size = 64;
+        std::vector<unsigned char> icon_pixels(
+            static_cast<std::size_t>(icon_size) * icon_size * 4);
+        vnm::ui::draw_vnm_icon(icon_pixels.data(), icon_size);
+        GLFWimage image;
+        image.width = icon_size;
+        image.height = icon_size;
+        image.pixels = icon_pixels.data();
+        glfwSetWindowIcon(app.window, 1, &image);
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -871,11 +1061,13 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     if (!xml_arg.empty()) {
-        load_xml(app, xml_arg);
+        if (xml_arg.size() > 5 && xml_arg.compare(xml_arg.size() - 5, 5, ".json") == 0) {
+            load_json(app, xml_arg);
+        } else {
+            load_xml(app, xml_arg);
+        }
     } else if (db_arg > 0) {
         load_db(app, storage_path, db_arg);
-    } else if (want_demo) {
-        load_demo(app);
     }
 
     if (auto_scan) {

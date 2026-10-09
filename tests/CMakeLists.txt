@@ -5,9 +5,11 @@ add_executable(vnm_test_net test_net.cpp)
 add_executable(vnm_test_diff test_diff.cpp)
 add_executable(vnm_test_storage test_storage.cpp)
 add_executable(vnm_test_passive test_passive.cpp)
+add_executable(vnm_test_export test_export.cpp)
 
 foreach(test_target vnm_test_model vnm_test_parse vnm_test_layout vnm_test_net
-                    vnm_test_diff vnm_test_storage vnm_test_passive)
+                    vnm_test_diff vnm_test_storage vnm_test_passive
+                    vnm_test_export)
     target_link_libraries(${test_target} PRIVATE vnm_core)
     target_include_directories(${test_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -22,3 +24,4 @@ add_test(NAME net     COMMAND vnm_test_net)
 add_test(NAME diff    COMMAND vnm_test_diff)
 add_test(NAME storage COMMAND vnm_test_storage)
 add_test(NAME passive COMMAND vnm_test_passive)
+add_test(NAME export  COMMAND vnm_test_export)

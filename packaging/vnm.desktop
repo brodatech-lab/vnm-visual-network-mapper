@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VNM - Visual Network Mapper
+Comment=Visual 2D network topology mapper built on Nmap
+Exec=vnm_gui
+Icon=vnm
+Terminal=true
+Categories=Network;Security;Monitor;
+Keywords=network;nmap;topology;scanner;
